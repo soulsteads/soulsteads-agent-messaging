@@ -213,8 +213,11 @@ fn all_source_configuration_oracles_match_without_panics() {
         .collect();
     for (index, case) in oracle["cases"].as_array().unwrap().iter().enumerate() {
         let mut actual = config::load(&case["input"].to_string(), &env).unwrap();
-        // Rust-only presentation extensions: validate disabled defaults, then compare
+        // Rust-only extensions: validate disabled defaults, then compare
         // every legacy field to the unchanged source-generated oracle.
+        if let Some(acp) = actual["acp"].as_object_mut() {
+            assert_eq!(acp.remove("agentHome"), Some(json!("")));
+        }
         if let Some(matrix) = actual["matrix"].as_object_mut() {
             assert_eq!(
                 matrix.remove("showFullPaths"),

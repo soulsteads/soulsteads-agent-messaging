@@ -4,7 +4,7 @@
   "verboseErrors":false,
   "toolMessages":{"mode":"events","showCalls":true,"showArguments":false,"showOutputFor":["bash"],"maxTraceEntries":20},
   "sessionPicker":{"enabled":false,"connectors":[],"mirrorIntervalSeconds":60},
-  "acp":{"command":"opencode","args":["acp"],"backendId":"","profileDir":"","defaultBackend":"opencode","backends":{"codex":{"command":"builtin:codex","args":[]},"claude":{"command":"builtin:claude","args":[]},"pi":{"command":"builtin:pi","args":[]}}},
+  "acp":{"command":"opencode","args":["acp"],"backendId":"","profileDir":"","agentHome":"","defaultBackend":"opencode","backends":{"codex":{"command":"builtin:codex","args":[]},"claude":{"command":"builtin:claude","args":[]},"pi":{"command":"builtin:pi","args":[]}}},
   "matrix":{"enabled":false,"homeserver":"https://matrix.org","userId":"","accessToken":"","password":"","deviceId":"OPENCODE_BRIDGE","encryption":{"enabled":false,"storePath":"./matrix-store/"},"autoJoin":true,"allowedRooms":[],"strictAllowedRooms":false,"interactivePermissions":false,"triggerPatterns":["!oc "],"ignoreRooms":[],"ignoreUsers":[],"allowedUsers":[],"formatHtml":false,"threadIsolation":true,"respondToThreadReplies":true,"respondToAllMessages":false,"showFullPaths":false,"terminalThread":{"mode":"off","threshold":3}},
   "mattermost":{"enabled":false,"url":"","token":"","teamName":"","respondToMentions":true,"respondToAllMessages":false,"respondToThreadReplies":true,"ignoreChannels":[],"ignoreUsers":[],"allowedUsers":[],"threadIsolation":true},
   "whatsapp":{"enabled":false,"authFolder":"./.whatsapp-auth","allowedUsers":[],"respondToOthers":true},

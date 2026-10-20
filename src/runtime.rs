@@ -641,6 +641,77 @@ pub(crate) fn telegram_approval_control(event: &Event) -> bool {
             .next()
             .is_some_and(|word| matches!(word.to_ascii_lowercase().as_str(), "/approve" | "/deny"))
 }
+
+fn resolve_agent_home(value: &Value, home: Option<&str>) -> Result<Option<PathBuf>> {
+    let Some(raw) = value.as_str() else {
+        bail!("acp.agentHome must be a string");
+    };
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    let path = if raw == "~" || raw.starts_with("~/") {
+        let base = home.context("acp.agentHome uses ~ but HOME is unavailable")?;
+        if raw == "~" {
+            PathBuf::from(base)
+        } else {
+            Path::new(base).join(&raw[2..])
+        }
+    } else {
+        PathBuf::from(raw)
+    };
+    if !path.is_absolute() {
+        bail!("acp.agentHome must be an absolute or ~/ path");
+    }
+    let canonical = std::fs::canonicalize(&path)
+        .with_context(|| format!("acp.agentHome is unavailable: {}", path.display()))?;
+    if !canonical.is_dir() {
+        bail!("acp.agentHome is not a directory: {}", canonical.display());
+    }
+    Ok(Some(canonical))
+}
+
+fn normalize_agent_homes(config: &mut Value, env: &BTreeMap<String, String>) -> Result<()> {
+    let home = env.get("HOME").map(String::as_str);
+    let global = resolve_agent_home(&config["acp"]["agentHome"], home)?;
+    config["acp"]["agentHome"] = global
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_default()
+        .into();
+    for backend in ["opencode", "codex", "claude", "pi"] {
+        let Some(settings) = config["acp"]["backends"][backend].as_object_mut() else {
+            continue;
+        };
+        if !settings.contains_key("agentHome") {
+            continue;
+        }
+        let configured = resolve_agent_home(&settings["agentHome"], home)?;
+        settings.insert(
+            "agentHome".into(),
+            configured
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_default()
+                .into(),
+        );
+    }
+    let opencode = if config["acp"]["backends"]["opencode"].is_object() {
+        &config["acp"]["backends"]["opencode"]
+    } else {
+        &config["acp"]
+    };
+    let opencode_home = opencode
+        .get("agentHome")
+        .or_else(|| config["acp"].get("agentHome"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty());
+    let profile = opencode["profileDir"].as_str().unwrap_or("");
+    if opencode_home.is_some() && !profile.is_empty() {
+        bail!("acp.profileDir cannot be combined with acp.agentHome");
+    }
+    Ok(())
+}
+
 pub struct Bridge {
     pub config: Value,
     pub env: BTreeMap<String, String>,
@@ -673,7 +744,36 @@ impl Bridge {
         }
     }
     pub fn working_directory(&self, event: &Event) -> PathBuf {
-        session_dir(&self.workspace, &event.platform, &self.context(event))
+        let backend = self.selected(&event.platform, &self.context(event)).ok();
+        backend
+            .as_deref()
+            .and_then(|backend| self.agent_home(backend).ok().flatten())
+            .unwrap_or_else(|| session_dir(&self.workspace, &event.platform, &self.context(event)))
+    }
+    fn agent_home(&self, backend: &str) -> Result<Option<PathBuf>> {
+        if let Some(home) = self.config["acp"]["backends"][backend]
+            .get("agentHome")
+            .and_then(Value::as_str)
+        {
+            return Ok((!home.is_empty()).then(|| PathBuf::from(home)));
+        }
+        let home = self.config["acp"]["agentHome"]
+            .as_str()
+            .context("acp.agentHome must be a string")?;
+        Ok((!home.is_empty()).then(|| PathBuf::from(home)))
+    }
+    fn expected_directory(&self, platform: &str, context: &str, backend: &str) -> Result<PathBuf> {
+        if let Some(home) = self.agent_home(backend)? {
+            return Ok(home);
+        }
+        let directory = session_dir(&self.workspace, platform, context);
+        std::fs::create_dir_all(&directory)?;
+        Ok(std::fs::canonicalize(directory)?)
+    }
+    fn configured_cwd_allows(&self, backend: &str, cwd: &str) -> Result<bool> {
+        Ok(self
+            .agent_home(backend)?
+            .is_none_or(|home| cwd == home.to_string_lossy()))
     }
     pub fn user_allowed(&self, event: &Event) -> bool {
         let config = &self.config[&event.platform];
@@ -726,11 +826,12 @@ impl Bridge {
         Self::new_with_restart_dispatcher(config, env, workspace, Arc::new(SystemdUserRestart))
     }
     pub fn new_with_restart_dispatcher(
-        config: Value,
+        mut config: Value,
         env: BTreeMap<String, String>,
         workspace: PathBuf,
         restart_dispatcher: Arc<dyn RestartDispatcher>,
     ) -> Result<Self> {
+        normalize_agent_homes(&mut config, &env)?;
         let path = string(&config, "sessionStorePath");
         if path.is_empty() {
             bail!("sessionStorePath is required");
@@ -1273,11 +1374,21 @@ impl Bridge {
             return Ok(client.clone());
         }
         let stored = self.store.get(platform, context, backend)?;
-        let directory = stored
-            .as_ref()
-            .map(|entry| PathBuf::from(&entry.cwd))
-            .unwrap_or_else(|| session_dir(&self.workspace, platform, context));
-        let profile = if backend == "opencode" {
+        let configured_home = self.agent_home(backend)?;
+        let directory = configured_home.clone().unwrap_or_else(|| {
+            stored
+                .as_ref()
+                .map(|entry| PathBuf::from(&entry.cwd))
+                .unwrap_or_else(|| session_dir(&self.workspace, platform, context))
+        });
+        let identity = self.backend_identity(backend)?;
+        if let Some(stored) = &stored
+            && (configured_home.is_some() || stored.backend_id.contains(";agent-home:"))
+            && (stored.cwd != directory.to_string_lossy() || stored.backend_id != identity)
+        {
+            bail!("Stored backend identity or workspace differs; history preserved");
+        }
+        let profile = if configured_home.is_none() && backend == "opencode" {
             self.backend_config(backend)?["profileDir"]
                 .as_str()
                 .filter(|profile| !profile.is_empty())
@@ -1290,6 +1401,8 @@ impl Bridge {
         let directory = if let Some(applied) = &applied {
             applied.verify()?;
             applied.directory.clone()
+        } else if configured_home.is_some() {
+            directory
         } else {
             std::fs::create_dir_all(&directory)?;
             std::fs::canonicalize(directory)?
@@ -1398,31 +1511,40 @@ impl Bridge {
     fn backend_identity(&self, backend: &str) -> Result<String> {
         let config = self.backend_config(backend)?;
         if !string(config, "backendId").is_empty() {
+            if let Some(home) = self.agent_home(backend)? {
+                return Ok(format!(
+                    "{};agent-home:{}",
+                    string(config, "backendId"),
+                    home.display()
+                ));
+            }
             return Ok(string(config, "backendId").to_owned());
         }
         let identity = std::iter::once(string(config, "command").to_owned())
             .chain(strings(config, "args"))
             .collect::<Vec<_>>();
-        Ok(format!(
+        let base = format!(
             "command-sha256:{:x}",
             Sha256::digest(serde_json::to_vec(&identity)?)
-        ))
+        );
+        Ok(self
+            .agent_home(backend)?
+            .map(|home| format!("{base};agent-home:{}", home.display()))
+            .unwrap_or(base))
     }
     async fn clear_stored(&self, platform: &str, context: &str, backend: &str) -> Result<()> {
         let Some(entry) = self.store.get(platform, context, backend)? else {
             return Ok(());
         };
         // Never delete a session through a changed backend or a picked/foreign cwd.
-        let expected = session_dir(&self.workspace, platform, context);
-        std::fs::create_dir_all(&expected)?;
-        let directory = std::fs::canonicalize(&expected)?;
+        let directory = self.expected_directory(platform, context, backend)?;
         if entry.cwd != directory.to_string_lossy()
             || entry.backend_id != self.backend_identity(backend)?
         {
             return Ok(());
         }
         let config = self.backend_config(backend)?;
-        let profile = if backend == "opencode" {
+        let profile = if self.agent_home(backend)?.is_none() && backend == "opencode" {
             config["profileDir"]
                 .as_str()
                 .filter(|value| !value.is_empty())
@@ -1452,6 +1574,17 @@ impl Bridge {
         Ok(())
     }
     async fn launch(&self, backend: &str, directory: &Path) -> Result<(Client, String)> {
+        if let Some(home) = self.agent_home(backend)? {
+            let actual = std::fs::canonicalize(directory).with_context(|| {
+                format!(
+                    "Configured agent home is unavailable: {}",
+                    directory.display()
+                )
+            })?;
+            if actual != home || !actual.is_dir() {
+                bail!("Configured agent home rejects a foreign or unavailable workspace");
+            }
+        }
         let config = self.backend_config(backend)?;
         let command = string(config, "command");
         if command.is_empty() {
@@ -1573,12 +1706,15 @@ impl Bridge {
                 .await;
         }
         if matches!(command, "/p" | "/projects") && argument.is_empty() {
-            let (client, _) = self.launch(&backend, &std::env::current_dir()?).await?;
+            let directory = self.expected_directory(&event.platform, context, &backend)?;
+            let (client, _) = self.launch(&backend, &directory).await?;
             let sessions = client.list_sessions().await;
             client.shutdown().await?;
             let mut counts = HashMap::<String, usize>::new();
             for session in sessions? {
-                if let Some(cwd) = session["cwd"].as_str().filter(|cwd| !cwd.is_empty()) {
+                if let Some(cwd) = session["cwd"].as_str().filter(|cwd| !cwd.is_empty())
+                    && self.configured_cwd_allows(&backend, cwd)?
+                {
                     *counts.entry(cwd.into()).or_default() += 1;
                 }
             }
@@ -1706,6 +1842,9 @@ impl Bridge {
         let session_id = session["sessionId"]
             .as_str()
             .context("Invalid saved session")?;
+        if !self.configured_cwd_allows(backend, cwd)? {
+            bail!("Configured agent home rejects a foreign session workspace");
+        }
         let (client, identity) = self.launch(backend, Path::new(cwd)).await?;
         let publication = async {
             if expected_identity.is_some_and(|expected| expected != identity) {
@@ -2527,12 +2666,11 @@ impl Bridge {
         )
     }
     async fn mirror_snapshot(&self, backend: &str, session: &Value) -> Result<Vec<Value>> {
-        let (client, _) = self
-            .launch(
-                backend,
-                Path::new(session["cwd"].as_str().context("Invalid mirror project")?),
-            )
-            .await?;
+        let cwd = session["cwd"].as_str().context("Invalid mirror project")?;
+        if !self.configured_cwd_allows(backend, cwd)? {
+            bail!("Configured agent home rejects a foreign session workspace");
+        }
+        let (client, _) = self.launch(backend, Path::new(cwd)).await?;
         let snapshot = client
             .load_session(
                 session["sessionId"]
