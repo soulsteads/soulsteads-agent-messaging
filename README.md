@@ -79,8 +79,8 @@ Setup for every platform is in the **[setup guide](docs/SETUP.md)**.
 | Platform | How to set it up |
 |---|---|
 | Telegram | [Guided setup](docs/SETUP.md#telegram) for Claude Code or Codex on Linux |
-| Matrix | [Manual setup](docs/SETUP.md#matrix) |
-| Mattermost | [Manual setup](docs/SETUP.md#mattermost) |
+| Matrix | [Account, configuration, and user-service walkthrough](docs/MATRIX.md) |
+| Mattermost | [Bot, configuration, and user-service walkthrough](docs/MATTERMOST.md) |
 | Slack | [Manual setup](docs/SETUP.md#slack) |
 | Discord | [Manual setup](docs/SETUP.md#discord) |
 | WhatsApp | [Manual setup](docs/SETUP.md#whatsapp) |
@@ -127,6 +127,7 @@ private helpers without expanding the production API. They run with `cargo test
 | Guide | Covers |
 |---|---|
 | [Setup guide](docs/SETUP.md) | Every platform, service commands, troubleshooting |
+| [Manual user service](docs/MANUAL-SERVICE.md) | Matrix/Mattermost installation, optional Agent Home boundary, upgrades and recovery |
 | [Configuration defaults](src/defaults.json) | Every available option |
 | [Hindsight memory](docs/HINDSIGHT.md) | Give Claude Code, Codex, OpenCode or Pi long-term memory |
 

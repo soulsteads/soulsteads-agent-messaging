@@ -201,8 +201,14 @@ coding agent through this same Telegram setup.
 
 ## Matrix
 
-Matrix needs manual configuration and the default-feature build, which includes
-the Matrix SDK.
+For a complete account-to-conversation walkthrough, follow the
+[Matrix guide](MATRIX.md) and [manual user-service guide](MANUAL-SERVICE.md).
+The settings below remain a connector reference.
+
+Matrix needs manual configuration and a build with `platform-sdks`. For an
+unencrypted setup, use `--no-default-features --features platform-sdks`; the
+default-feature build also includes encryption support, whose interoperability
+is not yet qualified.
 
 You need a Matrix account for the bot and its credentials: an access token (preferred) or a
 password. Add the following to `soulsteads-messaging.json`, replacing the placeholders:
@@ -290,6 +296,10 @@ encrypted room.
 ---
 
 ## Mattermost
+
+For a complete bot-to-conversation walkthrough, follow the
+[Mattermost guide](MATTERMOST.md) and [manual user-service guide](MANUAL-SERVICE.md).
+The settings below remain a connector reference.
 
 Use your Mattermost bot to talk to an agent in selected channels. The connector
 uses Mattermost's API and WebSocket connection; it does not need a separate
