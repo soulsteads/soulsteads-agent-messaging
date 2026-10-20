@@ -1,11 +1,13 @@
+#[cfg(feature = "reference-conformance")]
 #[path = "support/reference_source.rs"]
 mod reference_source;
+use serde_json::json;
 use soulsteads_messaging::{
     config,
     store::{Entry, Store},
 };
-use serde_json::json;
 
+#[cfg(feature = "reference-conformance")]
 #[test]
 fn mixed_actual_typescript_and_rust_writers_share_lock_and_preserve_all_entries() {
     let source = reference_source::root().join("src/session-store.ts");

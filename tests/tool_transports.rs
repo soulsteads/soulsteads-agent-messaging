@@ -1,3 +1,5 @@
+#![cfg(feature = "reference-conformance")]
+
 #[path = "support/reference_source.rs"]
 mod reference_source;
 use axum::{
@@ -5,11 +7,11 @@ use axum::{
     extract::{Request, State},
     routing::any,
 };
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     connectors::http::{Platform, PlatformSink},
     runtime::{Event, Sink},
 };
-use serde_json::{Value, json};
 use std::{future::IntoFuture, sync::Arc};
 use tokio::sync::Mutex;
 async fn endpoint(State(state): State<Arc<Mutex<Vec<Value>>>>, request: Request) -> Json<Value> {

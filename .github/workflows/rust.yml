@@ -17,6 +17,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      run: cargo build --locked --verbose
+    # The optional reference-conformance feature requires a separately supplied
+    # TypeScript checkout and Bun; it is not part of public/self-contained CI.
+    - name: Run self-contained tests
+      run: cargo test --locked --verbose
