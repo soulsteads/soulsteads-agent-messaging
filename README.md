@@ -89,6 +89,25 @@ Setup for every platform is in the **[setup guide](docs/SETUP.md)**.
 Credentials go in an environment file; [`.env.example`](.env.example) lists every
 variable the bridge reads.
 
+### Use a preconfigured agent directory
+
+If your agent already has a working directory with its normal instructions and
+configuration, select a runtime and set `acp.agentHome` to that existing absolute
+or `~/…` path. New sessions run there directly instead of receiving copied profile
+files:
+
+```json
+{
+  "acp": {
+    "defaultBackend": "codex",
+    "agentHome": "~/.soulsteads/agents/helper"
+  }
+}
+```
+
+See the [setup guide](docs/SETUP.md#how-manual-configuration-works) for backend
+overrides, validation, and migration behavior.
+
 ---
 
 ## Know before you connect

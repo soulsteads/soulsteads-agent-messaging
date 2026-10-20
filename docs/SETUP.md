@@ -54,6 +54,31 @@ The first build downloads dependencies and can take a while.
 - **Choose an agent.** `acp.defaultBackend` selects the agent. Built-in backends
   are `claude`, `codex` and `pi`; the default is `opencode`. For example,
   `{"acp": {"defaultBackend": "claude"}}`.
+- **Use an existing agent home (optional).** Set `acp.agentHome` to an absolute
+  directory or `~/…` path to run new ACP and native sessions in that exact
+  directory, so the agent reads its normal `AGENTS.md`, `CLAUDE.md`, OpenCode
+  configuration, and other runtime files. The directory must already exist; it
+  is canonicalized at startup and is never created or copied into. A backend can
+  override it with `acp.backends.<backend>.agentHome`; an explicit empty string
+  there disables the inherited home for that backend. Do not combine this with
+  OpenCode's legacy `acp.profileDir` copy mode.
+
+  ```json
+  {
+    "acp": {
+      "defaultBackend": "claude",
+      "agentHome": "~/agents/shared",
+      "backends": {
+        "codex": { "agentHome": "/srv/agents/codex" },
+        "pi": { "agentHome": "" }
+      }
+    }
+  }
+  ```
+
+  Changing, enabling, or disabling an agent home intentionally prevents an old
+  chat binding from resuming in a different identity. Use `/clear` to forget a
+  retained binding; it will not delete a session outside the configured home.
 - **Check, then run.**
 
   ```sh

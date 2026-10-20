@@ -55,10 +55,6 @@ async fn start() -> Result<()> {
     let mut configuration =
         config::Loader::default().load(&cwd, arguments.config.as_deref(), &environment)?;
     config::apply_runtime_overrides(&mut configuration, &environment)?;
-    if arguments.check_config {
-        println!("Configuration loaded successfully; no connectors started.");
-        return Ok(());
-    }
     let home = environment
         .get("HOME")
         .map(PathBuf::from)
@@ -72,6 +68,10 @@ async fn start() -> Result<()> {
         environment.clone(),
         sessions,
     )?);
+    if arguments.check_config {
+        println!("Configuration loaded successfully; no connectors started.");
+        return Ok(());
+    }
     if !arguments.serve {
         let console = Console::new(!arguments.no_images);
         if !arguments.prompt.is_empty() {
