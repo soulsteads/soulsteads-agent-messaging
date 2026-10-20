@@ -1,0 +1,8232 @@
+{
+  "source": "ce8ca57201c607494f1c930133f3758a792f0155",
+  "slack": [
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi "
+      },
+      "expected": {
+        "teamId": "ch_C1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "replyThreadTs": "ev1",
+        "contextId": "C1:ev1",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "ev1"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "teamId": "T1"
+      },
+      "expected": {
+        "teamId": "T1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "replyThreadTs": "ev1",
+        "contextId": "C1:ev1",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "ev1"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "threadTs": "root"
+      },
+      "expected": {
+        "teamId": "ch_C1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "threadTs": "root",
+        "replyThreadTs": "root",
+        "contextId": "C1:root",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "root"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "threadTs": "root",
+        "teamId": "T1"
+      },
+      "expected": {
+        "teamId": "T1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "threadTs": "root",
+        "replyThreadTs": "root",
+        "contextId": "C1:root",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "root"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi "
+      },
+      "expected": {
+        "teamId": "ch_C1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "replyThreadTs": "ev1",
+        "contextId": "C1:ev1",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1:ev1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "ev1"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "teamId": "T1"
+      },
+      "expected": {
+        "teamId": "T1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "replyThreadTs": "ev1",
+        "contextId": "C1:ev1",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1:ev1",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "ev1"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "threadTs": "root"
+      },
+      "expected": {
+        "teamId": "ch_C1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "threadTs": "root",
+        "replyThreadTs": "root",
+        "contextId": "C1:root",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1:root",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "root"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "eventTs": "ev1",
+        "text": " hi ",
+        "threadTs": "root",
+        "teamId": "T1"
+      },
+      "expected": {
+        "teamId": "T1",
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "eventTs": "ev1",
+        "threadTs": "root",
+        "replyThreadTs": "root",
+        "contextId": "C1:root",
+        "dedupeId": "C1:ev1"
+      },
+      "sessionId": "C1:root",
+      "reply": {
+        "channel": "C1",
+        "text": "answer",
+        "thread_ts": "root"
+      }
+    }
+  ],
+  "slackAdmission": [
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "<@BOT> hi",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "bot_message",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_changed",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "message_deleted",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "trigger": "!oc"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "threadTs": "root",
+        "subtype": "thread_broadcast",
+        "botId": "bot",
+        "trigger": "!oc"
+      },
+      "expected": false
+    }
+  ],
+  "mattermost": [
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "postId": "P1",
+        "text": " hi "
+      },
+      "expected": {
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "postId": "P1",
+        "rootId": "",
+        "replyRootId": "P1",
+        "sessionId": "C1",
+        "dedupeId": "C1:P1"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "channelId": "C1",
+        "postId": "P1",
+        "text": " hi ",
+        "rootId": "root"
+      },
+      "expected": {
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "postId": "P1",
+        "rootId": "root",
+        "replyRootId": "root",
+        "sessionId": "C1",
+        "dedupeId": "C1:P1"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "postId": "P1",
+        "text": " hi "
+      },
+      "expected": {
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "postId": "P1",
+        "rootId": "",
+        "replyRootId": "P1",
+        "sessionId": "C1:P1",
+        "dedupeId": "C1:P1"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "channelId": "C1",
+        "postId": "P1",
+        "text": " hi ",
+        "rootId": "root"
+      },
+      "expected": {
+        "channelId": "C1",
+        "userId": "unknown",
+        "text": " hi ",
+        "postId": "P1",
+        "rootId": "root",
+        "replyRootId": "root",
+        "sessionId": "C1:root",
+        "dedupeId": "C1:P1"
+      }
+    }
+  ],
+  "mattermostAdmission": [
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc hi",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "rootId": "",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "rootId": "root",
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    }
+  ],
+  "telegram": [
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": false,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "private",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "private",
+        "isForumTopic": true,
+        "isPrivate": true,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "group",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "group",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": false
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": false,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": false,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": null,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 0,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 0,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123:0",
+        "dedupeId": "-123:8"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "chat": {
+          "id": -123,
+          "type": "supergroup",
+          "is_forum": true
+        },
+        "from": {
+          "id": 456
+        },
+        "messageId": 8,
+        "text": " hi ",
+        "is_topic_message": true,
+        "message_thread_id": 7,
+        "reply_to_message": {
+          "message_id": 7,
+          "from": {
+            "id": 42,
+            "is_bot": true
+          }
+        }
+      },
+      "expected": {
+        "chatId": "-123",
+        "userId": "456",
+        "messageId": 8,
+        "text": "hi",
+        "messageThreadId": 7,
+        "replyToMessageId": 7,
+        "replyToMessageFromId": "42",
+        "replyToMessageIsBot": true,
+        "chatType": "supergroup",
+        "isForumTopic": true,
+        "isPrivate": false,
+        "sessionId": "-123:7",
+        "dedupeId": "-123:8"
+      }
+    }
+  ],
+  "telegramImplicit": [
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!oc",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "!OC hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "@bot hi",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": null,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": true,
+        "messageThreadId": 7,
+        "trigger": "!oc",
+        "botUsername": "bot"
+      },
+      "expected": false
+    }
+  ],
+  "telegramBotReply": [
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "text": "hi",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": false,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": false,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": null,
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "42",
+        "ourBotId": 42
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "text": "",
+        "enabled": true,
+        "isPrivate": false,
+        "replyToMessageIsBot": true,
+        "replyToMessageFromId": "43",
+        "ourBotId": 42
+      },
+      "expected": false
+    }
+  ],
+  "telegramAttachmentBypass": [
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": false,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": false
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": false,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": false,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": false,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": null,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": false,
+        "hasActiveSession": true
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": false
+      },
+      "expected": true
+    },
+    {
+      "input": {
+        "hasAttachments": true,
+        "isPrivate": true,
+        "implicitTopicRepliesEnabled": true,
+        "threadIsolation": true,
+        "messageThreadId": 7,
+        "isReplyToThisBot": true,
+        "hasActiveSession": true
+      },
+      "expected": true
+    }
+  ],
+  "attachments": [
+    {
+      "input": {},
+      "expected": []
+    },
+    {
+      "input": {
+        "photo": [
+          {
+            "file_id": "a",
+            "file_size": 100
+          },
+          {
+            "file_id": "b",
+            "file_size": 10
+          },
+          {
+            "file_id": "c"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "photo",
+          "fileId": "a",
+          "mimeType": "image/jpeg",
+          "size": 100
+        }
+      ]
+    },
+    {
+      "input": {
+        "photo": [
+          {
+            "file_id": "a"
+          },
+          {
+            "file_id": "b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "photo",
+          "fileId": "b",
+          "mimeType": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "input": {
+        "photo": [
+          null,
+          "bad",
+          {},
+          {
+            "file_id": "c"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "photo",
+          "fileId": "c",
+          "mimeType": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "input": {
+        "document": {
+          "file_id": "d",
+          "file_name": "../../a.pdf",
+          "mime_type": "application/pdf",
+          "file_size": 5
+        }
+      },
+      "expected": [
+        {
+          "kind": "document",
+          "fileId": "d",
+          "mimeType": "application/pdf",
+          "size": 5,
+          "fileName": "../../a.pdf"
+        }
+      ]
+    },
+    {
+      "input": {
+        "video": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "video",
+          "fileId": "f",
+          "mimeType": "video/mp4"
+        }
+      ]
+    },
+    {
+      "input": {
+        "video_note": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "video_note",
+          "fileId": "f",
+          "mimeType": "video/mp4"
+        }
+      ]
+    },
+    {
+      "input": {
+        "audio": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "audio",
+          "fileId": "f",
+          "mimeType": "audio/mpeg"
+        }
+      ]
+    },
+    {
+      "input": {
+        "voice": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "voice",
+          "fileId": "f",
+          "mimeType": "audio/ogg"
+        }
+      ]
+    },
+    {
+      "input": {
+        "animation": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "animation",
+          "fileId": "f",
+          "mimeType": "video/mp4"
+        }
+      ]
+    },
+    {
+      "input": {
+        "sticker": {
+          "file_id": "f"
+        }
+      },
+      "expected": [
+        {
+          "kind": "sticker",
+          "fileId": "f",
+          "mimeType": "image/webp"
+        }
+      ]
+    }
+  ],
+  "retryDelays": [
+    {
+      "input": "undefined",
+      "expected": 5000
+    },
+    {
+      "input": -1,
+      "expected": 0
+    },
+    {
+      "input": 0,
+      "expected": 0
+    },
+    {
+      "input": 3,
+      "expected": 3000
+    },
+    {
+      "input": 300,
+      "expected": 300000
+    },
+    {
+      "input": 10000,
+      "expected": 300000
+    },
+    {
+      "input": "NaN",
+      "expected": 5000
+    },
+    {
+      "input": "Infinity",
+      "expected": 5000
+    }
+  ],
+  "extensions": [
+    {
+      "expected": "bin"
+    },
+    {
+      "input": "",
+      "expected": "bin"
+    },
+    {
+      "input": "PNG",
+      "expected": "png"
+    },
+    {
+      "input": "..//pdf",
+      "expected": "pdf"
+    },
+    {
+      "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expected": "aaaaaaaaaaaaaaaa"
+    },
+    {
+      "input": "!@#",
+      "expected": "bin"
+    }
+  ]
+}

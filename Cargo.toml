@@ -1,0 +1,76 @@
+[package]
+name = "soulsteads-agent-messaging"
+version = "0.1.0"
+edition = "2024"
+authors = ["Scott Glover <scottgl@gmail.com>"]
+license = "Apache-2.0"
+description = "Native ACP chat bridge"
+default-run = "soulsteads-messaging"
+
+[features]
+default = ["platform-sdks", "matrix-encryption"]
+platform-sdks = ["dep:matrix-sdk", "dep:whatsapp-rust", "dep:whatsapp-rust-sqlite-storage", "dep:qrcode"]
+matrix-encryption = ["platform-sdks", "matrix-sdk/e2e-encryption", "matrix-sdk/automatic-room-key-forwarding"]
+
+[lib]
+name = "soulsteads_messaging"
+
+[[bin]]
+name = "soulsteads-messaging"
+path = "src/main.rs"
+
+[[bin]]
+name = "codex-acp-rust"
+path = "src/bin/codex_acp.rs"
+
+[[bin]]
+name = "opencode-acp-rust"
+path = "src/bin/opencode_acp.rs"
+
+[[bin]]
+name = "claude-acp-rust"
+path = "src/bin/claude_acp.rs"
+
+[[bin]]
+name = "pi-acp-rust"
+path = "src/bin/pi_acp.rs"
+
+[[bin]]
+name = "acp-fixture"
+path = "tests/fixtures/acp.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = { version = "0.8", features = ["ws", "multipart"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+futures-util = "0.3"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+pulldown-cmark = "0.13"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+matrix-sdk = { version = "0.19.1", optional = true, default-features = false, features = ["bundled-sqlite", "markdown", "rustls-aws-lc-rs"] }
+whatsapp-rust = { version = "0.7.0", optional = true, default-features = false, features = ["tokio-transport", "tokio-runtime", "ureq-client", "tokio-native"] }
+whatsapp-rust-sqlite-storage = { version = "0.7.0", optional = true, default-features = false }
+sha2 = "0.10"
+libc = "0.2"
+qrcode = { version = "0.14", default-features = false, features = ["svg"], optional = true }
+agent-client-protocol = { version = "3.3.0", features = ["stdio"] }
+futures = "0.3"
+tempfile = "3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+
+[profile.release]
+lto = "thin"
+strip = true

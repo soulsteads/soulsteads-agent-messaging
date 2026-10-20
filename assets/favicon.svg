@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Robot</title>
+  <rect width="64" height="64" rx="14" fill="#2563eb"/>
+  <path d="M32 9v7" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="32" cy="8" r="3" fill="#ffffff"/>
+  <rect x="10" y="27" width="6" height="16" rx="3" fill="#bfdbfe"/>
+  <rect x="48" y="27" width="6" height="16" rx="3" fill="#bfdbfe"/>
+  <rect x="14" y="17" width="36" height="36" rx="10" fill="#ffffff"/>
+  <circle cx="25" cy="31" r="4" fill="#1e3a8a"/>
+  <circle cx="39" cy="31" r="4" fill="#1e3a8a"/>
+  <path d="M23 42h18" stroke="#1e3a8a" stroke-width="4" stroke-linecap="round"/>
+</svg>

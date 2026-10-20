@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1068 130" role="img" aria-labelledby="t d">
+  <title id="t">How the bridge connects chat apps to coding agents</title>
+  <desc id="d">A chat app and a coding agent exchange messages in both directions through soulsteads-messaging, which runs on your machine.</desc>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#38bdf8"/>
+    </marker>
+    <clipPath id="c1"><rect x="10" y="15" width="270" height="100" rx="14"/></clipPath>
+    <clipPath id="c2"><rect x="344" y="15" width="340" height="100" rx="14"/></clipPath>
+    <clipPath id="c3"><rect x="748" y="15" width="310" height="100" rx="14"/></clipPath>
+  </defs>
+  <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="start">
+    <rect x="10" y="15" width="270" height="100" rx="14" fill="#14306b" stroke="#2563eb" stroke-width="2"/>
+    <rect x="10" y="15" width="8" height="100" fill="#2563eb" clip-path="url(#c1)"/>
+    <text x="38" y="57" font-size="22" font-weight="700" fill="#ffffff">Chat app</text>
+    <text x="38" y="87" font-size="13" fill="#cbd5e1">Telegram · Matrix · Slack · …</text>
+    <rect x="344" y="15" width="340" height="100" rx="14" fill="#0b1b3a" stroke="#38bdf8" stroke-width="2"/>
+    <rect x="344" y="15" width="8" height="100" fill="#38bdf8" clip-path="url(#c2)"/>
+    <text x="372" y="57" font-size="22" font-weight="700" fill="#ffffff">soulsteads-messaging</text>
+    <text x="372" y="87" font-size="13" fill="#cbd5e1">Runs on your machine</text>
+    <rect x="748" y="15" width="310" height="100" rx="14" fill="#14306b" stroke="#2563eb" stroke-width="2"/>
+    <rect x="748" y="15" width="8" height="100" fill="#f59e0b" clip-path="url(#c3)"/>
+    <text x="776" y="57" font-size="22" font-weight="700" fill="#ffffff">Coding agent</text>
+    <text x="776" y="87" font-size="13" fill="#cbd5e1">Claude Code · Codex · OpenCode · Pi</text>
+  </g>
+  <g stroke="#38bdf8" stroke-width="3" stroke-linecap="round">
+    <line x1="292" y1="65" x2="332" y2="65" marker-start="url(#head)" marker-end="url(#head)"/>
+    <line x1="696" y1="65" x2="736" y2="65" marker-start="url(#head)" marker-end="url(#head)"/>
+  </g>
+</svg>

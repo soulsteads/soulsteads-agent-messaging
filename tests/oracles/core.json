@@ -1,0 +1,676 @@
+{
+  "source": "ce8ca57201c607494f1c930133f3758a792f0155",
+  "config": {
+    "botName": "oc",
+    "trigger": "!oc",
+    "rateLimitSeconds": 5,
+    "sessionStorePath": "./.opencode/chat-sessions.json",
+    "defaultAgent": null,
+    "verboseErrors": false,
+    "toolMessages": {
+      "mode": "events",
+      "showCalls": true,
+      "showArguments": false,
+      "showOutputFor": [
+        "bash"
+      ],
+      "maxTraceEntries": 20
+    },
+    "sessionPicker": {
+      "enabled": false,
+      "connectors": [],
+      "mirrorIntervalSeconds": 60
+    },
+    "acp": {
+      "command": "opencode",
+      "args": [
+        "acp"
+      ],
+      "backendId": "",
+      "profileDir": "",
+      "defaultBackend": "opencode",
+      "backends": {}
+    },
+    "matrix": {
+      "enabled": false,
+      "homeserver": "https://matrix.org",
+      "userId": "",
+      "accessToken": "",
+      "password": "",
+      "deviceId": "OPENCODE_BRIDGE",
+      "encryption": {
+        "enabled": false,
+        "storePath": "./matrix-store/"
+      },
+      "autoJoin": true,
+      "allowedRooms": [],
+      "strictAllowedRooms": false,
+      "interactivePermissions": false,
+      "triggerPatterns": [
+        "!oc "
+      ],
+      "ignoreRooms": [],
+      "ignoreUsers": [],
+      "allowedUsers": [],
+      "formatHtml": false,
+      "threadIsolation": true,
+      "respondToThreadReplies": true,
+      "respondToAllMessages": false
+    },
+    "mattermost": {
+      "enabled": false,
+      "url": "",
+      "token": "",
+      "teamName": "",
+      "respondToMentions": true,
+      "respondToThreadReplies": true,
+      "ignoreChannels": [],
+      "ignoreUsers": [],
+      "allowedUsers": [],
+      "threadIsolation": true
+    },
+    "whatsapp": {
+      "enabled": false,
+      "authFolder": "./.whatsapp-auth",
+      "allowedUsers": [],
+      "respondToOthers": true
+    },
+    "slack": {
+      "enabled": false,
+      "allowedUsers": [],
+      "threadIsolation": true,
+      "respondToThreadReplies": true
+    },
+    "discord": {
+      "enabled": false,
+      "allowedUsers": []
+    },
+    "telegram": {
+      "enabled": false,
+      "token": "",
+      "respondToMentions": true,
+      "threadIsolation": true,
+      "respondToImplicitTopicReplies": true,
+      "respondToReplies": true,
+      "attachments": {
+        "enabled": true,
+        "maxFileBytes": 20971520,
+        "maxFilesPerMessage": 4
+      },
+      "ignoreChats": [],
+      "ignoreUsers": [],
+      "allowedUsers": []
+    },
+    "web": {
+      "enabled": false,
+      "port": 3420,
+      "host": "0.0.0.0",
+      "allowedOrigins": [
+        "*"
+      ],
+      "publicUrl": "",
+      "attachments": {
+        "enabled": false,
+        "maxFileBytes": 5242880,
+        "maxFilesPerMessage": 1,
+        "maxWidth": 4096,
+        "maxHeight": 4096,
+        "maxPixels": 20000000,
+        "resizeMaxDimension": 2048,
+        "allowedMimeTypes": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ]
+      }
+    }
+  },
+  "sessionDirs": [
+    {
+      "id": "",
+      "expected": "/test/sessions/matrix/thread"
+    },
+    {
+      "id": "plain_123",
+      "expected": "/test/sessions/matrix/plain_123"
+    },
+    {
+      "id": "a/b",
+      "expected": "/test/sessions/matrix/a_b-c14cddc033f6"
+    },
+    {
+      "id": "a:b",
+      "expected": "/test/sessions/matrix/a_b-6783a31eabf6"
+    },
+    {
+      "id": "!room:server/$thread",
+      "expected": "/test/sessions/matrix/_room_server__thread-9bf7903250a5"
+    },
+    {
+      "id": "☃😀",
+      "expected": "/test/sessions/matrix/___-5dd26c5c47fe"
+    },
+    {
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": "/test/sessions/matrix/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-79072a47bfaa"
+    },
+    {
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "expected": "/test/sessions/matrix/________________________________________________________________________________________________________________________-792100ef2a03"
+    }
+  ],
+  "tokens": [
+    {
+      "chars": -100,
+      "expected": 0
+    },
+    {
+      "chars": 0,
+      "expected": 0
+    },
+    {
+      "chars": 1,
+      "expected": 0
+    },
+    {
+      "chars": 2,
+      "expected": 1
+    },
+    {
+      "chars": 3,
+      "expected": 1
+    },
+    {
+      "chars": 5,
+      "expected": 1
+    },
+    {
+      "chars": 6,
+      "expected": 2
+    },
+    {
+      "chars": 7,
+      "expected": 2
+    },
+    {
+      "chars": 100,
+      "expected": 25
+    }
+  ],
+  "media": [
+    {
+      "text": "",
+      "images": [],
+      "imageClean": "",
+      "docs": [],
+      "docClean": "",
+      "sanitized": ""
+    },
+    {
+      "text": "Hello",
+      "images": [],
+      "imageClean": "Hello",
+      "docs": [],
+      "docClean": "Hello",
+      "sanitized": "Hello"
+    },
+    {
+      "text": "[DOCLIBRARY_IMAGE] /tmp/pic.png [/DOCLIBRARY_IMAGE]",
+      "images": [
+        "/tmp/pic.png"
+      ],
+      "imageClean": "",
+      "docs": [],
+      "docClean": "[DOCLIBRARY_IMAGE] /tmp/pic.png [/DOCLIBRARY_IMAGE]",
+      "sanitized": "[DOCLIBRARY_IMAGE] pic.png [/DOCLIBRARY_IMAGE]"
+    },
+    {
+      "text": "[doclibrary_image]/tmp/a.png[/doclibrary_image] Path: /tmp/a.png",
+      "images": [
+        "/tmp/a.png"
+      ],
+      "imageClean": "",
+      "docs": [],
+      "docClean": "[doclibrary_image]/tmp/a.png[/doclibrary_image] Path: /tmp/a.png",
+      "sanitized": "[doclibrary_image]a.png[/doclibrary_image] Path: a.png"
+    },
+    {
+      "text": "Path: /tmp/a.jpg\ntext",
+      "images": [
+        "/tmp/a.jpg"
+      ],
+      "imageClean": "text",
+      "docs": [],
+      "docClean": "Path: /tmp/a.jpg\ntext",
+      "sanitized": "Path: a.jpg\ntext"
+    },
+    {
+      "text": "[DOCLIBRARY_DOC]/tmp/report.pdf[/DOCLIBRARY_DOC]",
+      "images": [],
+      "imageClean": "[DOCLIBRARY_DOC]/tmp/report.pdf[/DOCLIBRARY_DOC]",
+      "docs": [
+        "/tmp/report.pdf"
+      ],
+      "docClean": "",
+      "sanitized": "[DOCLIBRARY_DOC]report.pdf[/DOCLIBRARY_DOC]"
+    },
+    {
+      "text": "File: /home/user/cache/file.png",
+      "images": [],
+      "imageClean": "File: /home/user/cache/file.png",
+      "docs": [],
+      "docClean": "File: /home/user/cache/file.png",
+      "sanitized": "File: file.png"
+    },
+    {
+      "text": "https://host/x and /home/user/file.png",
+      "images": [],
+      "imageClean": "https://host/x and /home/user/file.png",
+      "docs": [],
+      "docClean": "https://host/x and /home/user/file.png",
+      "sanitized": "https://host/x and /home/user/file.png"
+    },
+    {
+      "text": "[DOCLIBRARY_IMAGE][/DOCLIBRARY_IMAGE]",
+      "images": [],
+      "imageClean": "[DOCLIBRARY_IMAGE][/DOCLIBRARY_IMAGE]",
+      "docs": [],
+      "docClean": "[DOCLIBRARY_IMAGE][/DOCLIBRARY_IMAGE]",
+      "sanitized": "[DOCLIBRARY_IMAGE][/DOCLIBRARY_IMAGE]"
+    },
+    {
+      "text": "[DOCLIBRARY_IMAGE]/tmp/b.webp[/DOCLIBRARY_IMAGE] [DOCLIBRARY_DOC]/tmp/a.pdf[/DOCLIBRARY_DOC]",
+      "images": [
+        "/tmp/b.webp"
+      ],
+      "imageClean": "[DOCLIBRARY_DOC]/tmp/a.pdf[/DOCLIBRARY_DOC]",
+      "docs": [
+        "/tmp/a.pdf"
+      ],
+      "docClean": "[DOCLIBRARY_IMAGE]/tmp/b.webp[/DOCLIBRARY_IMAGE]",
+      "sanitized": "[DOCLIBRARY_IMAGE]b.webp[/DOCLIBRARY_IMAGE] [DOCLIBRARY_DOC]a.pdf[/DOCLIBRARY_DOC]"
+    }
+  ],
+  "empty": [
+    {
+      "acp": "",
+      "bridge": "",
+      "clean": "",
+      "expected": {
+        "source": "acp-no-text",
+        "acpChars": 0,
+        "bridgeChars": 0,
+        "cleanChars": 0
+      }
+    },
+    {
+      "acp": "😀",
+      "bridge": "",
+      "clean": "",
+      "expected": {
+        "source": "bridge-capture-lost",
+        "acpChars": 2,
+        "bridgeChars": 0,
+        "cleanChars": 0
+      }
+    },
+    {
+      "acp": "x",
+      "bridge": "x",
+      "clean": "",
+      "expected": {
+        "source": "bridge-processing-removed",
+        "acpChars": 1,
+        "bridgeChars": 1,
+        "cleanChars": 0
+      }
+    },
+    {
+      "acp": "",
+      "bridge": "z",
+      "clean": "",
+      "expected": {
+        "source": "bridge-processing-removed",
+        "acpChars": 0,
+        "bridgeChars": 1,
+        "cleanChars": 0
+      }
+    },
+    {
+      "acp": "",
+      "bridge": "",
+      "clean": "visible",
+      "expected": null
+    }
+  ],
+  "botName": [
+    {
+      "text": "oc: hi",
+      "name": "oc",
+      "expected": "hi"
+    },
+    {
+      "text": "oc: hi",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "oc: hi",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "@oc: hi",
+      "name": "oc",
+      "expected": "hi"
+    },
+    {
+      "text": "@oc: hi",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "@oc: hi",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "OC hi",
+      "name": "oc",
+      "expected": "hi"
+    },
+    {
+      "text": "OC hi",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "OC hi",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "ocx: hi",
+      "name": "oc",
+      "expected": null
+    },
+    {
+      "text": "ocx: hi",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "ocx: hi",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "oc",
+      "name": "oc",
+      "expected": null
+    },
+    {
+      "text": "oc",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "oc",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "@oc",
+      "name": "oc",
+      "expected": null
+    },
+    {
+      "text": "@oc",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "@oc",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "oc:",
+      "name": "oc",
+      "expected": ""
+    },
+    {
+      "text": "oc:",
+      "name": "[agent]+",
+      "expected": null
+    },
+    {
+      "text": "oc:",
+      "name": "",
+      "expected": null
+    },
+    {
+      "text": "[agent]+: hi",
+      "name": "oc",
+      "expected": null
+    },
+    {
+      "text": "[agent]+: hi",
+      "name": "[agent]+",
+      "expected": "hi"
+    },
+    {
+      "text": "[agent]+: hi",
+      "name": "",
+      "expected": null
+    }
+  ],
+  "matrixContexts": [
+    {
+      "isolated": true,
+      "input": {
+        "roomId": "!room:server",
+        "eventId": "$evt",
+        "sender": "@user:server",
+        "text": "hi",
+        "threadRootEventId": ""
+      },
+      "expected": {
+        "roomId": "!room:server",
+        "sender": "@user:server",
+        "text": "hi",
+        "eventId": "$evt",
+        "threadRootEventId": "",
+        "replyThreadRootId": "$evt",
+        "sessionId": "!room:server:$evt",
+        "dedupeId": "$evt"
+      }
+    },
+    {
+      "isolated": true,
+      "input": {
+        "roomId": "!room:server",
+        "eventId": "$evt",
+        "sender": "@user:server",
+        "text": "hi",
+        "threadRootEventId": "$root"
+      },
+      "expected": {
+        "roomId": "!room:server",
+        "sender": "@user:server",
+        "text": "hi",
+        "eventId": "$evt",
+        "threadRootEventId": "$root",
+        "replyThreadRootId": "$root",
+        "sessionId": "!room:server:$root",
+        "dedupeId": "$evt"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "roomId": "!room:server",
+        "eventId": "$evt",
+        "sender": "@user:server",
+        "text": "hi",
+        "threadRootEventId": ""
+      },
+      "expected": {
+        "roomId": "!room:server",
+        "sender": "@user:server",
+        "text": "hi",
+        "eventId": "$evt",
+        "threadRootEventId": "",
+        "replyThreadRootId": "$evt",
+        "sessionId": "!room:server",
+        "dedupeId": "$evt"
+      }
+    },
+    {
+      "isolated": false,
+      "input": {
+        "roomId": "!room:server",
+        "eventId": "$evt",
+        "sender": "@user:server",
+        "text": "hi",
+        "threadRootEventId": "$root"
+      },
+      "expected": {
+        "roomId": "!room:server",
+        "sender": "@user:server",
+        "text": "hi",
+        "eventId": "$evt",
+        "threadRootEventId": "$root",
+        "replyThreadRootId": "$root",
+        "sessionId": "!room:server",
+        "dedupeId": "$evt"
+      }
+    }
+  ],
+  "matrixThreadRelation": {
+    "rel_type": "m.thread",
+    "event_id": "$root",
+    "is_falling_back": true,
+    "m.in_reply_to": {
+      "event_id": "$last"
+    }
+  },
+  "matrixPolicy": [
+    {
+      "strictAllowedRooms": true,
+      "allowedRooms": [],
+      "autoJoin": true,
+      "allowed": false,
+      "join": false
+    },
+    {
+      "strictAllowedRooms": true,
+      "allowedRooms": [],
+      "autoJoin": false,
+      "allowed": false,
+      "join": false
+    },
+    {
+      "strictAllowedRooms": true,
+      "allowedRooms": [
+        "!room:server"
+      ],
+      "autoJoin": true,
+      "allowed": true,
+      "join": true
+    },
+    {
+      "strictAllowedRooms": true,
+      "allowedRooms": [
+        "!room:server"
+      ],
+      "autoJoin": false,
+      "allowed": true,
+      "join": false
+    },
+    {
+      "strictAllowedRooms": false,
+      "allowedRooms": [],
+      "autoJoin": true,
+      "allowed": true,
+      "join": true
+    },
+    {
+      "strictAllowedRooms": false,
+      "allowedRooms": [],
+      "autoJoin": false,
+      "allowed": true,
+      "join": false
+    },
+    {
+      "strictAllowedRooms": false,
+      "allowedRooms": [
+        "!room:server"
+      ],
+      "autoJoin": true,
+      "allowed": true,
+      "join": true
+    },
+    {
+      "strictAllowedRooms": false,
+      "allowedRooms": [
+        "!room:server"
+      ],
+      "autoJoin": false,
+      "allowed": true,
+      "join": false
+    }
+  ],
+  "matrixReply": [
+    {
+      "text": "hi",
+      "enabled": true,
+      "expected": true
+    },
+    {
+      "text": "hi",
+      "enabled": false,
+      "expected": false
+    },
+    {
+      "text": "!oc",
+      "enabled": true,
+      "expected": false
+    },
+    {
+      "text": "!oc",
+      "enabled": false,
+      "expected": false
+    },
+    {
+      "text": "!oc query",
+      "enabled": true,
+      "expected": false
+    },
+    {
+      "text": "!oc query",
+      "enabled": false,
+      "expected": false
+    },
+    {
+      "text": "@bot:server hi",
+      "enabled": true,
+      "expected": false
+    },
+    {
+      "text": "@bot:server hi",
+      "enabled": false,
+      "expected": false
+    },
+    {
+      "text": "",
+      "enabled": true,
+      "expected": false
+    },
+    {
+      "text": "",
+      "enabled": false,
+      "expected": false
+    }
+  ]
+}
