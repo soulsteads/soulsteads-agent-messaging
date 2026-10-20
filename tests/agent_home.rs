@@ -226,6 +226,102 @@ async fn disabling_home_with_explicit_backend_id_refuses_old_binding_before_laun
     bridge.shutdown().await.unwrap();
 }
 
+#[tokio::test]
+async fn reload_rejects_disabled_home_before_launch_and_preserves_binding() {
+    for command in ["/r", "/reload"] {
+        for explicit_identity in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let agent_home = home(root.path(), "home");
+            let audit = root.path().join("audit.jsonl");
+            let store_path = root.path().join("store.json");
+            let mut settings = configuration(root.path(), agent_home.to_string_lossy().into());
+            settings["sessionPicker"] = json!({"enabled": true, "connectors": ["web"]});
+            settings["acp"]["env"]["ACP_FIXTURE_RPC_AUDIT"] = audit.to_string_lossy().into();
+            if explicit_identity {
+                settings["acp"]["backendId"] = "explicit".into();
+            }
+            let bridge = Bridge::new(
+                settings.clone(),
+                BTreeMap::new(),
+                root.path().join("sessions"),
+            )
+            .unwrap();
+            bridge
+                .handle(Event::web("bound", "hello"), &Recorder::default())
+                .await
+                .unwrap();
+            bridge.shutdown().await.unwrap();
+            let before = std::fs::read(&store_path).unwrap();
+            let calls = std::fs::read(&audit).unwrap();
+            settings["acp"]["agentHome"] = "".into();
+            let bridge =
+                Bridge::new(settings, BTreeMap::new(), root.path().join("sessions")).unwrap();
+            let error = bridge
+                .handle(Event::web("bound", command), &Recorder::default())
+                .await
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("Stored backend identity differs"),
+                "{error:#}"
+            );
+            assert_eq!(
+                std::fs::read(&audit).unwrap(),
+                calls,
+                "{command} must reject before initializing any backend (explicit identity: {explicit_identity})"
+            );
+            assert_eq!(
+                std::fs::read(&store_path).unwrap(),
+                before,
+                "rejection must preserve the binding byte-for-byte"
+            );
+            bridge.shutdown().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn reload_accepts_unchanged_home_and_resumes_saved_session() {
+    for command in ["/r", "/reload"] {
+        let root = tempfile::tempdir().unwrap();
+        let agent_home = home(root.path(), "home");
+        let audit = root.path().join("audit.jsonl");
+        let mut settings = configuration(root.path(), agent_home.to_string_lossy().into());
+        settings["sessionPicker"] = json!({"enabled": true, "connectors": ["web"]});
+        settings["acp"]["env"]["ACP_FIXTURE_RPC_AUDIT"] = audit.to_string_lossy().into();
+        let bridge = Bridge::new(
+            settings.clone(),
+            BTreeMap::new(),
+            root.path().join("sessions"),
+        )
+        .unwrap();
+        bridge
+            .handle(Event::web("bound", "hello"), &Recorder::default())
+            .await
+            .unwrap();
+        bridge.shutdown().await.unwrap();
+        let store = Store::new(root.path().join("store.json"));
+        let before = store.get("web", "bound", "opencode").unwrap().unwrap();
+        let calls = rpc(&audit).len();
+        let bridge = Bridge::new(settings, BTreeMap::new(), root.path().join("sessions")).unwrap();
+        bridge
+            .handle(Event::web("bound", command), &Recorder::default())
+            .await
+            .unwrap();
+        let after = store.get("web", "bound", "opencode").unwrap().unwrap();
+        assert_eq!(after.session_id, before.session_id);
+        assert_eq!(after.cwd, before.cwd);
+        assert_eq!(after.backend_id, before.backend_id);
+        assert!(
+            rpc(&audit)[calls..]
+                .iter()
+                .any(|row| row["method"] == "session/load")
+        );
+        bridge.shutdown().await.unwrap();
+    }
+}
+
 #[test]
 fn empty_opencode_home_allows_legacy_profile_without_inheriting_global_home() {
     let root = tempfile::tempdir().unwrap();
