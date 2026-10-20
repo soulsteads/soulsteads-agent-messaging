@@ -116,6 +116,12 @@ see [reference conformance tests](tests/reference/README.md) for the explicit
 `reference-conformance` opt-in. No private reference checkout is needed for the
 default tests.
 
+Connector implementations live under `src/connectors/`; Matrix-specific modules
+are grouped under `src/connectors/matrix/`. Connector unit-test bodies live under
+`tests/connectors/` and are included as test-only modules so they can exercise
+private helpers without expanding the production API. They run with `cargo test
+--locked --lib`; the other root-level test files remain integration tests.
+
 ## More documentation
 
 | Guide | Covers |
