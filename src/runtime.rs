@@ -1845,11 +1845,12 @@ impl Bridge {
         if !self.configured_cwd_allows(backend, cwd)? {
             bail!("Configured agent home rejects a foreign session workspace");
         }
+        let identity = self.backend_identity(backend)?;
+        if expected_identity.is_some_and(|expected| expected != identity) {
+            bail!("Stored backend identity differs");
+        }
         let (client, identity) = self.launch(backend, Path::new(cwd)).await?;
         let publication = async {
-            if expected_identity.is_some_and(|expected| expected != identity) {
-                bail!("Stored backend identity differs");
-            }
             let mut unavailable = false;
             let history = match client.load_session(session_id, false).await {
                 Ok(history) => history,
