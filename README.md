@@ -107,6 +107,15 @@ variable the bridge reads.
 
 ---
 
+## Development checks
+
+Run `cargo build --locked` and `cargo test --locked` for the self-contained Rust
+build and test suite used by public CI. Tests that execute the historical
+TypeScript implementation require a separately supplied reference and Bun;
+see [reference conformance tests](tests/reference/README.md) for the explicit
+`reference-conformance` opt-in. No private reference checkout is needed for the
+default tests.
+
 ## More documentation
 
 | Guide | Covers |

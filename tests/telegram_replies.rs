@@ -1,11 +1,11 @@
+#[cfg(feature = "reference-conformance")]
 #[path = "support/reference_source.rs"]
 mod reference_source;
 use axum::{Json, Router, extract::State, routing::post};
-use soulsteads_messaging::{
-    connectors::http::{Platform, PlatformSink},
-    runtime::Sink,
-};
 use serde_json::{Value, json};
+use soulsteads_messaging::connectors::http::Platform;
+#[cfg(feature = "reference-conformance")]
+use soulsteads_messaging::{connectors::http::PlatformSink, runtime::Sink};
 use std::{future::IntoFuture, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -33,6 +33,7 @@ async fn send(
     }
 }
 
+#[cfg(feature = "reference-conformance")]
 #[tokio::test]
 async fn telegram_real_http_reply_routing_matches_executed_source_and_retries_rejected_parent() {
     let directory = tempfile::tempdir().unwrap();

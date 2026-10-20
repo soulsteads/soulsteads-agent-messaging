@@ -1,12 +1,13 @@
+#[cfg(feature = "reference-conformance")]
 #[path = "support/reference_source.rs"]
 mod reference_source;
 use async_trait::async_trait;
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
     store::Store,
 };
-use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path};
 use tokio::sync::Mutex;
 #[derive(Default)]
@@ -50,54 +51,57 @@ fn assert_cleanup_audit(requests: &[Value]) {
 #[tokio::test]
 async fn stored_only_clear_resumes_matching_binding_then_forgets_it_despite_delete_error() {
     let root = tempfile::tempdir().unwrap();
-    let source_root = root.path().join("source");
-    std::fs::create_dir(&source_root).unwrap();
-    std::fs::write(
-        source_root.join("soulsteads-messaging.json"),
-        configuration(&source_root).to_string(),
-    )
-    .unwrap();
-    let source = reference_source::root();
-    let output = std::process::Command::new("bun")
-        .arg("--no-env-file")
-        .arg(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/source-stored-clear.ts"
-        ))
-        .arg(source)
-        .current_dir(&source_root)
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap())
-        .env("HOME", &source_root)
-        .env("SESSION_BASE_DIR", source_root.join("sessions"))
-        .env("TMPDIR", root.path())
-        .env("BUN_RUNTIME_TRANSPILER_CACHE_PATH", "0")
-        .output()
+    #[cfg(feature = "reference-conformance")]
+    {
+        let source_root = root.path().join("source");
+        std::fs::create_dir(&source_root).unwrap();
+        std::fs::write(
+            source_root.join("soulsteads-messaging.json"),
+            configuration(&source_root).to_string(),
+        )
         .unwrap();
-    assert!(
-        output.status.success(),
-        "Source failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let observed: Value = serde_json::from_str(
-        stdout
-            .lines()
-            .find(|line| line.starts_with("{\"clearEvents\""))
-            .expect("Source result JSON missing"),
-    )
-    .unwrap();
-    assert_cleanup_audit(observed["requests"].as_array().unwrap());
-    assert!(
-        observed["clearEvents"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r["text"] == "Session cleared. Next message will start a fresh session.")
-    );
-    println!(
-        "Actual Source stored-only clear resumes and attempts delete, then opens fresh: verified"
-    );
+        let source = reference_source::root();
+        let output = std::process::Command::new("bun")
+            .arg("--no-env-file")
+            .arg(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/source-stored-clear.ts"
+            ))
+            .arg(source)
+            .current_dir(&source_root)
+            .env_clear()
+            .env("PATH", std::env::var("PATH").unwrap())
+            .env("HOME", &source_root)
+            .env("SESSION_BASE_DIR", source_root.join("sessions"))
+            .env("TMPDIR", root.path())
+            .env("BUN_RUNTIME_TRANSPILER_CACHE_PATH", "0")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "Source failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let observed: Value = serde_json::from_str(
+            stdout
+                .lines()
+                .find(|line| line.starts_with("{\"clearEvents\""))
+                .expect("Source result JSON missing"),
+        )
+        .unwrap();
+        assert_cleanup_audit(observed["requests"].as_array().unwrap());
+        assert!(
+            observed["clearEvents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r["text"] == "Session cleared. Next message will start a fresh session.")
+        );
+        println!(
+            "Actual Source stored-only clear resumes and attempts delete, then opens fresh: verified"
+        );
+    }
     let rust_root = root.path().join("rust");
     std::fs::create_dir(&rust_root).unwrap();
     let cfg = configuration(&rust_root);

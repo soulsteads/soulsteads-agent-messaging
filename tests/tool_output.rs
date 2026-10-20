@@ -1,11 +1,13 @@
+#![cfg(feature = "reference-conformance")]
+
 #[path = "support/reference_source.rs"]
 mod reference_source;
 use async_trait::async_trait;
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
 };
-use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tokio::sync::Mutex;
 

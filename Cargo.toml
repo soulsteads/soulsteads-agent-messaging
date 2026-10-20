@@ -8,6 +8,8 @@ description = "Native ACP chat bridge"
 default-run = "soulsteads-messaging"
 
 [features]
+# Requires the separately supplied, pinned TypeScript test reference and Bun.
+reference-conformance = []
 default = ["platform-sdks", "matrix-encryption"]
 platform-sdks = ["dep:matrix-sdk", "dep:whatsapp-rust", "dep:whatsapp-rust-sqlite-storage", "dep:qrcode"]
 matrix-encryption = ["platform-sdks", "matrix-sdk/e2e-encryption", "matrix-sdk/automatic-room-key-forwarding"]
