@@ -225,11 +225,10 @@ async fn profile_reconnect_load_overwrites_but_active_reuse_and_leftovers_are_re
 #[cfg(target_os = "linux")]
 #[tokio::test]
 async fn profile_relative_path_is_process_cwd_relative() {
-    let root = tempfile::tempdir().unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let root = tempfile::tempdir_in(&cwd).unwrap();
     let source = profile(root.path());
-    let relative = source
-        .strip_prefix(std::env::current_dir().unwrap())
-        .unwrap();
+    let relative = source.strip_prefix(&cwd).unwrap();
     let bridge = Bridge::new(
         configuration(root.path(), relative),
         BTreeMap::new(),
