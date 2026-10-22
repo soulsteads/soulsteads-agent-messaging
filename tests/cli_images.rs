@@ -13,7 +13,7 @@ fn root() -> tempfile::TempDir {
     tempfile::Builder::new()
         .prefix("cli-images-")
         .permissions(std::fs::Permissions::from_mode(0o700))
-        .tempdir_in(concat!(env!("CARGO_MANIFEST_DIR"), "/.build-tmp"))
+        .tempdir()
         .unwrap()
 }
 

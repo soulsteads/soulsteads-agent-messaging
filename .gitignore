@@ -1,6 +1,6 @@
-# Local build scratch and coding-agent reports
-/.build-tmp/*
-!/.build-tmp/.gitkeep
+# Local build scratch and coding-agent reports (never version scratch directories)
+/.build-tmp/
+/.buildtmp/
 /matrix-repair-result.txt
 /port-result.txt
 

@@ -124,7 +124,7 @@ async fn buffered_completion_and_trailing_chunk_close_one_collector_without_dela
 #[tokio::test]
 async fn nonnormal_followup_result_wins_and_rejected_followup_keeps_one_collector() {
     for reason in ["refusal", "max_tokens", "cancelled", "error"] {
-        let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+        let directory = tempfile::tempdir().unwrap();
         let client = Client::connect(followup_fixture(
             directory.path(),
             json!([
@@ -379,7 +379,7 @@ async fn real_subprocess_initializes_assembles_filters_and_controls() {
 
 #[tokio::test]
 async fn active_followup_has_one_collector_and_cancellation_finishes() {
-    let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let mut config = options();
     config.cwd = directory.path().to_owned();
     config.env.insert(
@@ -448,7 +448,7 @@ async fn active_followup_has_one_collector_and_cancellation_finishes() {
 #[tokio::test]
 async fn child_exit_rejects_pending_instead_of_hanging() {
     for pending_followup in [false, true] {
-        let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+        let directory = tempfile::tempdir().unwrap();
         let actions = if pending_followup {
             json!([{"hold":true}, {"exit":true}])
         } else {
@@ -528,7 +528,7 @@ async fn child_exit_rejects_pending_instead_of_hanging() {
 #[tokio::test]
 async fn coding_turns_outlive_control_deadlines_without_replay() {
     for mode in ["original", "with-followup", "draining-followup"] {
-        let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+        let directory = tempfile::tempdir().unwrap();
         let mut config = followup_fixture(directory.path(), json!([{"hold":true},{"hold":true}]));
         config.timeout = Duration::from_millis(250);
         let client = Client::connect(config).await.unwrap();
@@ -599,7 +599,7 @@ async fn coding_turns_outlive_control_deadlines_without_replay() {
 async fn dropped_followup_closes_collector_without_replay() {
     {
         let failure = "followup-drop";
-        let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+        let directory = tempfile::tempdir().unwrap();
         let has_followup = true;
         let mut actions = vec![json!({"hold":true})];
         if has_followup {
@@ -754,7 +754,7 @@ async fn long_stream_collects_600_chunks_without_overflow() {
 
 #[tokio::test]
 async fn collector_waits_for_delayed_followup_after_original_rpc() {
-    let directory = tempfile::tempdir_in(".build-tmp").unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let client = Client::connect(followup_fixture(
         directory.path(),
         json!([
