@@ -187,6 +187,47 @@ impl Event {
         }
     }
 }
+
+#[derive(Clone)]
+struct PromptInteraction {
+    permissions: bool,
+    forms: bool,
+    scope: Option<crate::connectors::matrix_permissions::Scope>,
+}
+
+struct PromptPresentation {
+    live_updates: bool,
+    tool_messages: Value,
+    platform: String,
+    terminal_thread: Value,
+    matrix_full_paths: bool,
+}
+
+/// The common execution input after a human route has resolved its owned session.
+/// It deliberately carries no `Event`, so a future peer owner can share the same
+/// ACP turn without entering the human command interpreter.
+struct ResolvedPrompt<'a> {
+    text: &'a str,
+    images: &'a [Value],
+    interaction: PromptInteraction,
+    presentation: PromptPresentation,
+}
+
+impl<'a> ResolvedPrompt<'a> {
+    fn human(
+        text: &'a str,
+        images: &'a [Value],
+        interaction: PromptInteraction,
+        presentation: PromptPresentation,
+    ) -> Self {
+        Self {
+            text,
+            images,
+            interaction,
+            presentation,
+        }
+    }
+}
 #[async_trait]
 pub trait Sink: Send + Sync {
     async fn emit(&self, event: Value) -> Result<()>;
@@ -2274,8 +2315,9 @@ impl Bridge {
                 }
                 drop(dispatch);
             }
+            let submission = self.resolve_human_prompt(&client, event, sink).await?;
             let (result, tool_results, had_activity, observation, delivery) =
-                self.prompt_attempt(&client, event, sink).await?;
+                self.prompt_attempt(&client, &submission, sink).await?;
             if event.platform == "web" {
                 let empty = crate::core::sanitize(&crate::core::media(&result.text, false).1)
                     .trim()
@@ -2502,34 +2544,60 @@ impl Bridge {
         observation["uploadFailures"] = failed_uploads.into();
         finish_response(sink, text, observation, successful_images).await
     }
-    async fn prompt_attempt(
-        &self,
-        client: &Client,
-        event: &Event,
+    async fn resolve_human_prompt<'a>(
+        &'a self,
+        client: &'a Client,
+        event: &'a Event,
         sink: &dyn Sink,
-    ) -> Result<(crate::acp::Response, String, bool, Value, InlineDelivery)> {
-        use futures_util::{StreamExt, stream::FuturesUnordered};
-        let interactive = matches!(event.platform.as_str(), "matrix" | "telegram")
+    ) -> Result<ResolvedPrompt<'a>> {
+        let session = client.session_id().await;
+        let permissions = matches!(event.platform.as_str(), "matrix" | "telegram")
             && self.config[&event.platform]["interactivePermissions"] == true
             && !event.id.is_empty()
             && !event.user.is_empty()
             && !event.room.is_empty()
-            && client
-                .session_id()
-                .await
+            && session
+                .as_deref()
                 .is_some_and(|session| !session.is_empty());
-        let (mut permission_requests, _permission_guard) = if interactive {
+        let forms = event.platform == "matrix"
+            && self.config["matrix"]["interactiveQuestions"] != false
+            && !event.id.is_empty()
+            && !event.user.is_empty()
+            && !event.room.is_empty();
+        let interaction = PromptInteraction {
+            permissions,
+            forms,
+            scope: (permissions || forms)
+                .then(|| self.permission_scope(event, sink, client.working_directory())),
+        };
+        let presentation = PromptPresentation {
+            live_updates: true,
+            tool_messages: self.config["toolMessages"].clone(),
+            platform: event.platform.clone(),
+            terminal_thread: self.config["matrix"]["terminalThread"].clone(),
+            matrix_full_paths: self.config["matrix"]["showFullPaths"] == true,
+        };
+        Ok(ResolvedPrompt::human(
+            &event.text,
+            &event.images,
+            interaction,
+            presentation,
+        ))
+    }
+    async fn prompt_attempt(
+        &self,
+        client: &Client,
+        submission: &ResolvedPrompt<'_>,
+        sink: &dyn Sink,
+    ) -> Result<(crate::acp::Response, String, bool, Value, InlineDelivery)> {
+        use futures_util::{StreamExt, stream::FuturesUnordered};
+        let (mut permission_requests, _permission_guard) = if submission.interaction.permissions {
             let (requests, guard) = client.permission_handler();
             (Some(requests), Some(guard))
         } else {
             (None, None)
         };
-        let question_interactive = event.platform == "matrix"
-            && self.config["matrix"]["interactiveQuestions"] != false
-            && !event.id.is_empty()
-            && !event.user.is_empty()
-            && !event.room.is_empty();
-        let (mut form_requests, _form_guard) = if question_interactive {
+        let (mut form_requests, _form_guard) = if submission.interaction.forms {
             client
                 .form_handler()
                 .map(|(guard, receiver)| (Some(receiver), Some(guard)))
@@ -2539,30 +2607,30 @@ impl Bridge {
         };
         let mut questions = FuturesUnordered::new();
         let mut approvals = FuturesUnordered::new();
-        let scope = self.permission_scope(event, sink, client.working_directory());
+        let scope = submission.interaction.scope.clone();
         let mut receiver = client.subscribe();
-        let prompt = client.prompt(&event.text, event.images.clone());
+        let prompt = client.prompt(submission.text, submission.images.to_vec());
         tokio::pin!(prompt);
         let mut captured = String::new();
         let mut presentation_lost = false;
         let mut delivery = InlineDelivery::default();
         let mut presenter = crate::tools::TurnPresenter::new(
-            self.config["toolMessages"].clone(),
-            &event.platform,
-            self.config["matrix"]["terminalThread"].clone(),
+            submission.presentation.tool_messages.clone(),
+            &submission.presentation.platform,
+            submission.presentation.terminal_thread.clone(),
         )
-        .with_matrix_full_paths(self.config["matrix"]["showFullPaths"] == true);
+        .with_matrix_full_paths(submission.presentation.matrix_full_paths);
         let result = loop {
             tokio::select! {
                 result = &mut prompt => break result,
                 request = async { match form_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
-                    if let Some(request) = request {
+                    if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
                         questions.push(self.questions.request(scope.clone(), request.form, request.current, request.reply, sink));
                     } else { form_requests = None; }
                 }
                 Some(()) = questions.next(), if !questions.is_empty() => {}
                 request = async { match permission_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
-                    if let Some(request) = request {
+                    if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
                         approvals.push(self.permissions.request(scope.clone(), request, sink));
                     } else { permission_requests = None; }
                 }
@@ -2570,10 +2638,17 @@ impl Bridge {
                 update = receiver.recv() => {
                     match update {
                         Ok(update) => {
-                            deliver_inline(client, sink, &mut delivery, update["collectorImageCount"].as_u64().unwrap_or(0) as usize).await;
-                            present_update(sink, &update, &mut captured, &mut presenter).await;
+                            if submission.presentation.live_updates {
+                                deliver_inline(client, sink, &mut delivery, update["collectorImageCount"].as_u64().unwrap_or(0) as usize).await;
+                                present_update(sink, &update, &mut captured, &mut presenter).await;
+                            }
                         },
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => { presentation_lost = true; let _ = sink.emit(json!({"type":"error","message":"Activity stream overflow; final response remains intact."})).await; },
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            presentation_lost = true;
+                            if submission.presentation.live_updates {
+                                let _ = sink.emit(json!({"type":"error","message":"Activity stream overflow; final response remains intact."})).await;
+                            }
+                        },
                         Err(_) => break Err(anyhow::anyhow!("ACP update channel closed")),
                     }
                 }
@@ -2584,14 +2659,16 @@ impl Bridge {
         loop {
             match receiver.try_recv() {
                 Ok(update) => {
-                    deliver_inline(
-                        client,
-                        sink,
-                        &mut delivery,
-                        update["collectorImageCount"].as_u64().unwrap_or(0) as usize,
-                    )
-                    .await;
-                    present_update(sink, &update, &mut captured, &mut presenter).await;
+                    if submission.presentation.live_updates {
+                        deliver_inline(
+                            client,
+                            sink,
+                            &mut delivery,
+                            update["collectorImageCount"].as_u64().unwrap_or(0) as usize,
+                        )
+                        .await;
+                        present_update(sink, &update, &mut captured, &mut presenter).await;
+                    }
                 }
                 Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
                     presentation_lost = true
@@ -2599,7 +2676,9 @@ impl Bridge {
                 Err(_) => break,
             }
         }
-        deliver_inline(client, sink, &mut delivery, usize::MAX).await;
+        if submission.presentation.live_updates {
+            deliver_inline(client, sink, &mut delivery, usize::MAX).await;
+        }
         let (output, stop_reason, model) = client.prompt_observation().await;
         let partial = result
             .as_ref()
@@ -2847,6 +2926,62 @@ pub fn csv(value: &str) -> Vec<String> {
 #[cfg(test)]
 #[path = "runtime_expiry_tests.rs"]
 mod expiry_tests;
+
+#[cfg(test)]
+mod resolved_prompt_tests {
+    use super::*;
+
+    #[test]
+    fn human_submission_records_resolved_scope_permissions_prompt_and_presentation() {
+        let event = Event {
+            platform: "matrix".into(),
+            room: "!room:example".into(),
+            thread: "$thread".into(),
+            id: "$event".into(),
+            reply_to: None,
+            user: "@human:example".into(),
+            text: "ship the reviewed change".into(),
+            direct: false,
+            mentioned: true,
+            bot: false,
+            images: vec![json!({"type":"image","url":"mxc://example/image"})],
+        };
+
+        let submission = ResolvedPrompt::human(
+            &event.text,
+            &event.images,
+            PromptInteraction {
+                permissions: true,
+                forms: true,
+                scope: Some(crate::connectors::matrix_permissions::Scope {
+                    sender: event.user.clone(),
+                    room: event.room.clone(),
+                    thread: event.thread.clone(),
+                    context: "matrix\0!room:example:$thread".into(),
+                    cwd: PathBuf::from("/workspace/project"),
+                }),
+            },
+            PromptPresentation {
+                live_updates: true,
+                tool_messages: json!({"tool_call":true}),
+                platform: "matrix".into(),
+                terminal_thread: json!(true),
+                matrix_full_paths: true,
+            },
+        );
+
+        assert_eq!(submission.interaction.permissions, true);
+        assert_eq!(submission.interaction.forms, true);
+        assert_eq!(
+            submission.interaction.scope.as_ref().unwrap().context,
+            "matrix\0!room:example:$thread"
+        );
+        assert_eq!(submission.text, "ship the reviewed change");
+        assert_eq!(submission.images, event.images.as_slice());
+        assert!(submission.presentation.live_updates);
+        assert_eq!(submission.presentation.platform, "matrix");
+    }
+}
 pub fn session_dir(base: &Path, platform: &str, identifier: &str) -> PathBuf {
     let sanitized: String = identifier
         .encode_utf16()
