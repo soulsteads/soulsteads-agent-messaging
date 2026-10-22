@@ -5,6 +5,7 @@ pub mod config;
 pub mod connectors;
 pub mod core;
 pub mod debug_log;
+pub mod delivery;
 pub mod media;
 pub use adapters::opencode::native_client;
 pub use adapters::opencode::native_events;
