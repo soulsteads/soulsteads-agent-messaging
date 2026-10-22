@@ -17,6 +17,96 @@ struct Server {
     compact_release: PathBuf,
 }
 
+#[derive(Clone, Copy)]
+enum Backend {
+    Codex,
+    Claude,
+    Pi,
+    OpenCode,
+}
+
+impl Backend {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Claude => "claude",
+            Self::Pi => "pi",
+            Self::OpenCode => "opencode",
+        }
+    }
+
+    fn audit_file(self) -> &'static str {
+        match self {
+            Self::OpenCode => "rpc.jsonl",
+            Self::Codex | Self::Claude | Self::Pi => "native.jsonl",
+        }
+    }
+
+    fn configuration(
+        self,
+        root: &Path,
+        audit: &Path,
+        marker: &Path,
+        compact_release: &Path,
+        compact_failure: bool,
+    ) -> Value {
+        match self {
+            Self::Codex => json!({
+                "command": env!("CARGO_BIN_EXE_codex-acp-rust"),
+                "args": [],
+                "env": {
+                    "CODEX_PATH": env!("CARGO_BIN_EXE_acp-fixture"),
+                    "ACP_CODEX_FIXTURE": "1",
+                    "CODEX_FIXTURE_AUDIT": audit,
+                    "CODEX_FIXTURE_COMPACT_MARKER": marker,
+                    "CODEX_FIXTURE_COMPACT_RELEASE": compact_release,
+                    "CODEX_FIXTURE_COMPACT_FAILURE": compact_failure.to_string(),
+                }
+            }),
+            Self::Claude => json!({
+                "command": env!("CARGO_BIN_EXE_claude-acp-rust"),
+                "args": [],
+                "env": {
+                    "CLAUDE_CODE_EXECUTABLE": env!("CARGO_BIN_EXE_acp-fixture"),
+                    "CLAUDE_CONFIG_DIR": root.join("config"),
+                    "ACP_CLAUDE_FIXTURE": "1",
+                    "CLAUDE_FIXTURE_AUDIT": audit,
+                }
+            }),
+            Self::Pi => json!({
+                "command": env!("CARGO_BIN_EXE_pi-acp-rust"),
+                "args": [],
+                "env": {
+                    "PI_PATH": env!("CARGO_BIN_EXE_acp-fixture"),
+                    "ACP_PI_FIXTURE": "1",
+                    "PI_CODING_AGENT_DIR": root.join("agent"),
+                    "PI_FIXTURE_AUDIT": audit,
+                }
+            }),
+            Self::OpenCode => json!({
+                "command": env!("CARGO_BIN_EXE_opencode-acp-rust"),
+                "args": [],
+                "env": {
+                    "OPENCODE_PATH": env!("CARGO_BIN_EXE_acp-fixture"),
+                    "ACP_FIXTURE_RPC_AUDIT": audit,
+                }
+            }),
+        }
+    }
+
+    fn native_prompt_count(self, requests: &[Value]) -> usize {
+        requests
+            .iter()
+            .filter(|request| match self {
+                Self::Codex => request["method"] == "turn/start",
+                Self::Claude => request["type"] == "user",
+                Self::Pi => request["type"] == "prompt",
+                Self::OpenCode => request["method"] == "session/prompt",
+            })
+            .count()
+    }
+}
+
 impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.start_kill();
@@ -24,42 +114,40 @@ impl Drop for Server {
 }
 
 impl Server {
-    async fn start(root: &Path, compact_failure: bool) -> Self {
+    async fn start(root: &Path, compact_failure: bool, backend: Backend) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);
-        let audit = root.join("native.jsonl");
+        let audit = root.join(backend.audit_file());
         let marker = root.join("compact.marker");
         let compact_release = root.join("compact.release");
         let config = root.join("config.json");
-        std::fs::write(
-            &config,
-            json!({
-                "rateLimitSeconds": 0,
-                "sessionStorePath": root.join("store.json"),
-                "acp": {
-                    "defaultBackend": "codex",
-                    "timeoutMs": 3000,
-                    "backends": {"codex": {
-                        "command": env!("CARGO_BIN_EXE_codex-acp-rust"),
-                        "args": [],
-                        "env": {
-                            "CODEX_PATH": env!("CARGO_BIN_EXE_acp-fixture"),
-                            "ACP_CODEX_FIXTURE": "1",
-                            "CODEX_FIXTURE_AUDIT": audit,
-                            "CODEX_FIXTURE_COMPACT_MARKER": marker,
-                            "CODEX_FIXTURE_COMPACT_RELEASE": compact_release,
-                            "CODEX_FIXTURE_COMPACT_FAILURE": compact_failure.to_string(),
-                        }
-                    }}
-                },
-                "web": {"enabled": true, "host": "127.0.0.1", "port": address.port(), "allowedOrigins": ["http://127.0.0.1"]},
-                "telegram": {"enabled": false}, "matrix": {"enabled": false}, "mattermost": {"enabled": false},
-                "slack": {"enabled": false}, "discord": {"enabled": false}, "whatsapp": {"enabled": false}
-            })
-            .to_string(),
-        )
-        .unwrap();
+        let mut backends = serde_json::Map::new();
+        backends.insert(
+            backend.name().to_owned(),
+            backend.configuration(root, &audit, &marker, &compact_release, compact_failure),
+        );
+        let mut settings = json!({
+            "rateLimitSeconds": 0,
+            "sessionStorePath": root.join("store.json"),
+            "acp": {
+                "defaultBackend": backend.name(),
+                "timeoutMs": 3000,
+                "backends": backends
+            },
+            "web": {"enabled": true, "host": "127.0.0.1", "port": address.port(), "allowedOrigins": ["http://127.0.0.1"]},
+            "telegram": {"enabled": false}, "matrix": {"enabled": false}, "mattermost": {"enabled": false},
+            "slack": {"enabled": false}, "discord": {"enabled": false}, "whatsapp": {"enabled": false}
+        });
+        if matches!(backend, Backend::OpenCode) {
+            let specification =
+                backend.configuration(root, &audit, &marker, &compact_release, compact_failure);
+            settings["acp"]
+                .as_object_mut()
+                .unwrap()
+                .extend(specification.as_object().unwrap().clone());
+        }
+        std::fs::write(&config, settings.to_string()).unwrap();
         let home = root.join("home");
         let tmp = root.join("tmp");
         let sessions = root.join("sessions");
@@ -178,8 +266,8 @@ async fn wait_for_file(path: &Path) {
     .unwrap();
 }
 
-fn audit(root: &Path) -> Vec<Value> {
-    std::fs::read_to_string(root.join("native.jsonl"))
+fn audit(root: &Path, backend: Backend) -> Vec<Value> {
+    std::fs::read_to_string(root.join(backend.audit_file()))
         .unwrap_or_default()
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
@@ -199,10 +287,31 @@ fn visible(events: &[Value]) -> String {
         .collect()
 }
 
+fn assert_prompt_terminal_order(events: &[Value]) {
+    let output = events
+        .iter()
+        .position(|event| {
+            matches!(
+                event["type"].as_str(),
+                Some("chunk" | "response" | "notice")
+            )
+        })
+        .unwrap();
+    let prompt_end = events
+        .iter()
+        .position(|event| event["type"] == "prompt_end")
+        .unwrap();
+    let done = events
+        .iter()
+        .position(|event| event["type"] == "done")
+        .unwrap();
+    assert!(output < prompt_end && prompt_end < done, "{events:?}");
+}
+
 #[tokio::test]
 async fn compiled_web_api_codex_compact_acknowledges_only_after_native_terminal_and_recovers() {
     let root = tempfile::tempdir().unwrap();
-    let server = Server::start(root.path(), false).await;
+    let server = Server::start(root.path(), false, Backend::Codex).await;
     let mut socket = connect(&server).await;
     let setup = prompt(&mut socket, "hello").await;
     assert_eq!(visible(&setup), "native reply", "{setup:?}");
@@ -255,7 +364,7 @@ async fn compiled_web_api_codex_compact_acknowledges_only_after_native_terminal_
         std::fs::read_to_string(root.path().join("compact.marker")).unwrap(),
         "item completed; turn still active"
     );
-    let native = audit(root.path());
+    let native = audit(root.path(), Backend::Codex);
     assert_eq!(
         native
             .iter()
@@ -279,7 +388,7 @@ async fn compiled_web_api_codex_compact_acknowledges_only_after_native_terminal_
         followup.iter().all(|event| event["type"] != "error"),
         "{followup:?}"
     );
-    let native = audit(root.path());
+    let native = audit(root.path(), Backend::Codex);
     assert_eq!(
         native
             .iter()
@@ -296,7 +405,7 @@ async fn compiled_web_api_codex_compact_acknowledges_only_after_native_terminal_
 async fn compiled_web_api_codex_compact_failure_has_no_ack_and_ordinary_empty_prompt_still_errors()
 {
     let root = tempfile::tempdir().unwrap();
-    let server = Server::start(root.path(), true).await;
+    let server = Server::start(root.path(), true, Backend::Codex).await;
     let mut socket = connect(&server).await;
     let setup = prompt(&mut socket, "hello").await;
     assert_eq!(visible(&setup), "native reply", "{setup:?}");
@@ -322,7 +431,7 @@ async fn compiled_web_api_codex_compact_failure_has_no_ack_and_ordinary_empty_pr
             .any(|event| event["type"] == "session_state" && event["state"] == "stale-invalidated"),
         "{empty:?}"
     );
-    let native = audit(root.path());
+    let native = audit(root.path(), Backend::Codex);
     assert_eq!(
         native
             .iter()
@@ -347,4 +456,76 @@ async fn compiled_web_api_codex_compact_failure_has_no_ack_and_ordinary_empty_pr
     );
     socket.close(None).await.unwrap();
     server.stop().await;
+}
+
+#[tokio::test]
+async fn compiled_web_api_native_adapter_basics_cover_prompt_and_local_commands() {
+    for (backend, expected_reply) in [
+        (Backend::Claude, Some("native reply")),
+        (Backend::Pi, Some("native reply")),
+        (Backend::OpenCode, Some("hello world")),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let server = Server::start(root.path(), false, backend).await;
+        let mut socket = connect(&server).await;
+
+        let reply = prompt(&mut socket, "hello").await;
+        assert!(!visible(&reply).is_empty(), "{}: {reply:?}", backend.name());
+        if let Some(expected_reply) = expected_reply {
+            assert_eq!(
+                visible(&reply),
+                expected_reply,
+                "{}: {reply:?}",
+                backend.name()
+            );
+        }
+        assert_prompt_terminal_order(&reply);
+
+        let status = prompt(&mut socket, "/status").await;
+        assert!(
+            visible(&status).contains("Messages: 1"),
+            "{}: {status:?}",
+            backend.name()
+        );
+        let help = prompt(&mut socket, "/help").await;
+        assert!(
+            visible(&help).contains("Bridge commands:"),
+            "{}: {help:?}",
+            backend.name()
+        );
+        let clear = prompt(&mut socket, "/clear").await;
+        assert!(
+            visible(&clear).contains("Session cleared. Next message will start a fresh session."),
+            "{}: {clear:?}",
+            backend.name()
+        );
+        assert!(
+            clear
+                .iter()
+                .any(|event| event["type"] == "session_state" && event["state"] == "cleared"),
+            "{}: {clear:?}",
+            backend.name()
+        );
+        assert_eq!(
+            backend.native_prompt_count(&audit(root.path(), backend)),
+            1,
+            "{}: local commands must not submit native prompts",
+            backend.name()
+        );
+        for events in [&reply, &status, &help, &clear] {
+            assert!(
+                events.iter().all(|event| event["type"] != "error"),
+                "{}: {events:?}",
+                backend.name()
+            );
+            assert!(
+                !visible(events).contains("Sorry,"),
+                "{}: {events:?}",
+                backend.name()
+            );
+        }
+
+        socket.close(None).await.unwrap();
+        server.stop().await;
+    }
 }

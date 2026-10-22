@@ -135,6 +135,9 @@ see [reference conformance tests](tests/reference/README.md) for the explicit
 `reference-conformance` opt-in. No private reference checkout is needed for the
 default tests.
 
+For the optional in-process agent-request API and its test coverage and
+limitations, see [API qualification](docs/API-QUALIFICATION.md).
+
 Connector implementations live under `src/connectors/`; Matrix-specific modules
 are grouped under `src/connectors/matrix/`. Connector unit-test bodies live under
 `tests/connectors/` and are included as test-only modules so they can exercise

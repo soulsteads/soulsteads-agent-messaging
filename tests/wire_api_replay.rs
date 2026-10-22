@@ -547,6 +547,26 @@ struct RunningReplay {
 
 impl RunningReplay {
     async fn start(case: &ProtocolCase, held: bool) -> Result<(Self, tempfile::TempDir)> {
+        Self::start_with_fixture(case, held, false, None).await
+    }
+
+    async fn start_with_controls(
+        case: &ProtocolCase,
+        config_options: Value,
+    ) -> Result<(Self, tempfile::TempDir)> {
+        Self::start_with_fixture(case, false, false, Some(config_options)).await
+    }
+
+    async fn start_with_cancellable_hold(case: &ProtocolCase) -> Result<(Self, tempfile::TempDir)> {
+        Self::start_with_fixture(case, true, true, None).await
+    }
+
+    async fn start_with_fixture(
+        case: &ProtocolCase,
+        held: bool,
+        cancellable_hold: bool,
+        config_options: Option<Value>,
+    ) -> Result<(Self, tempfile::TempDir)> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let base = format!("http://{}", listener.local_addr()?);
         let fixture = WireReplayFixture::new(case.kind, base.clone());
@@ -558,11 +578,24 @@ impl RunningReplay {
             "ACP_FIXTURE_RPC_AUDIT".to_owned(),
             audit.to_string_lossy().to_string(),
         )]);
+        if let Some(config_options) = config_options {
+            acp_env.insert(
+                "ACP_FIXTURE_CONFIG_OPTIONS".to_owned(),
+                config_options.to_string(),
+            );
+        }
         if held {
             let script = root.path().join("held-script.json");
-            std::fs::write(
-                &script,
-                json!([{
+            let action = if cancellable_hold {
+                json!({
+                    "updates": [
+                        {"update": {"sessionUpdate": "tool_call", "toolCallId": "wire-read", "title": "read", "status": "in_progress", "rawInput": {"filePath": "wire.md"}}},
+                        {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": HELD_TEXT}}},
+                    ],
+                    "hold": true,
+                })
+            } else {
+                json!({
                     "updates": [
                         {"update": {"sessionUpdate": "tool_call", "toolCallId": "wire-read", "title": "read", "status": "in_progress", "rawInput": {"filePath": "wire.md"}}},
                         {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": HELD_TEXT}}},
@@ -570,9 +603,9 @@ impl RunningReplay {
                     "startedFile": started,
                     "releaseFile": release,
                     "stopReason": "end_turn",
-                }])
-                .to_string(),
-            )?;
+                })
+            };
+            std::fs::write(&script, json!([action]).to_string())?;
             acp_env.insert(
                 "ACP_FIXTURE_MATRIX_SCRIPT".to_owned(),
                 script.to_string_lossy().to_string(),
@@ -628,7 +661,7 @@ impl RunningReplay {
             shutdown,
             platform,
             server,
-            release_file: held.then_some(release),
+            release_file: (held && !cancellable_hold).then_some(release),
             cleaned: false,
         };
         running.wait_ready(case).await?;
@@ -697,16 +730,23 @@ impl Drop for RunningReplay {
     }
 }
 
+const COMMON_LOCAL_COMMANDS: &[(u64, &str, &str)] = &[
+    (1, "/help", "Bridge commands:"),
+    (2, "/h", "Bridge commands:"),
+    (3, "/commands", "Bridge commands:"),
+    (4, "/status", "No active session."),
+    (5, "/clear", "No active session."),
+    (6, "/reset", "No active session."),
+    (7, "/d", "No active session."),
+    (8, "/detach", "No active session."),
+    (9, "/backend", "Backend: opencode"),
+    (10, "/restart", "Restart is not enabled."),
+];
+
 async fn common_local_commands(case: &ProtocolCase) -> Result<()> {
     let (mut running, root) = RunningReplay::start(case, false).await?;
-    let result = async {
-        for (id, command, expected) in [
-            (1, "/help", "Bridge commands:"),
-            (2, "/h", "Bridge commands:"),
-            (3, "/status", "No active session."),
-            (4, "/clear", "No active session."),
-            (5, "/reset", "No active session."),
-        ] {
+    let result: Result<()> = async {
+        for &(id, command, expected) in COMMON_LOCAL_COMMANDS {
             let prior = running
                 .fixture
                 .requests()
@@ -727,7 +767,7 @@ async fn common_local_commands(case: &ProtocolCase) -> Result<()> {
         }
 
         if case.kind == "slack" {
-            for id in 1..=5 {
+            for id in 1..=COMMON_LOCAL_COMMANDS.len() as u64 {
                 running
                     .fixture
                     .wait_for_socket_input("Slack envelope acknowledgement", |value| {
@@ -766,7 +806,7 @@ async fn common_local_commands(case: &ProtocolCase) -> Result<()> {
             .iter()
             .filter(|request| is_output(case, request))
             .count()
-            == 5,
+            == COMMON_LOCAL_COMMANDS.len(),
         "local commands produced an unexpected outbound response count for {}: {requests:?}",
         case.kind
     );
@@ -777,12 +817,250 @@ async fn common_local_commands(case: &ProtocolCase) -> Result<()> {
             .any(|request| request["method"] == "session/prompt"),
         "local commands unexpectedly generated an ACP prompt: {methods:?}"
     );
+    ensure!(
+        methods
+            .iter()
+            .filter(|request| request["method"] == "session/new")
+            .count()
+            == 1,
+        "/restart must open exactly one ACP session without prompting: {methods:?}"
+    );
+    Ok(())
+}
+
+const CONTROL_COMMANDS: &[(u64, &str, &str)] = &[
+    (21, "/model two", "\"currentValue\":\"two\""),
+    (22, "/models", "\"id\":\"backend-model\""),
+    (23, "/effort high", "\"currentValue\":\"high\""),
+    (24, "/mode", "null"),
+    (25, "/agent", "null"),
+    (26, "/config backend-model one", "\"currentValue\":\"one\""),
+];
+
+async fn advertised_controls(case: &ProtocolCase) -> Result<()> {
+    let options = json!([
+        {"id":"backend-model","category":"model","currentValue":"one","options":[{"options":[{"value":"one"},{"value":"two"}]}]},
+        {"id":"reasoning","category":"thought_level","currentValue":"low","options":[{"value":"low"},{"value":"high"}]}
+    ]);
+    let (mut running, root) = RunningReplay::start_with_controls(case, options).await?;
+    let result: Result<()> = async {
+        for &(id, command, expected) in CONTROL_COMMANDS {
+            let prior = running
+                .fixture
+                .requests()
+                .await
+                .last()
+                .map(|request| request.ordinal)
+                .unwrap_or(0);
+            running.dispatch(case, command, id).await;
+            let response = running
+                .fixture
+                .wait_for_request(command, |request| {
+                    request.ordinal > prior
+                        && is_output(case, request)
+                        && output_text(case, request).is_some_and(|text| text.contains(expected))
+                })
+                .await?;
+            assert_routing(case, &response, id)?;
+        }
+        if case.kind == "slack" {
+            for &(id, _, _) in CONTROL_COMMANDS {
+                running
+                    .fixture
+                    .wait_for_socket_input("Slack envelope acknowledgement", |value| {
+                        value["envelope_id"] == format!("slack-envelope-{id}")
+                    })
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+    .await;
+    let requests = running.cleanup().await;
+    result?;
+    let requests = requests?;
+    ensure!(
+        requests
+            .iter()
+            .filter(|request| is_output(case, request))
+            .count()
+            == CONTROL_COMMANDS.len(),
+        "controls produced an unexpected outbound response count for {}: {requests:?}",
+        case.kind
+    );
+    let methods = rpc_audit(&root.path().join("rpc-audit.jsonl"), false)?;
+    ensure!(
+        methods
+            .iter()
+            .filter(|request| request["method"] == "session/new")
+            .count()
+            == 1,
+        "controls must share one opened ACP session: {methods:?}"
+    );
+    ensure!(
+        !methods
+            .iter()
+            .any(|request| request["method"] == "session/prompt"),
+        "controls unexpectedly generated an ACP prompt: {methods:?}"
+    );
+    Ok(())
+}
+
+const PICKER_DISABLED_COMMANDS: &[(u64, &str)] = &[
+    (41, "/p"),
+    (42, "/projects"),
+    (43, "/s"),
+    (44, "/sessions"),
+    (45, "/r"),
+    (46, "/reload"),
+    (47, "/m"),
+    (48, "/mirror"),
+];
+
+async fn picker_disabled_commands(case: &ProtocolCase) -> Result<()> {
+    let (mut running, root) = RunningReplay::start(case, false).await?;
+    let result: Result<()> = async {
+        for &(id, command) in PICKER_DISABLED_COMMANDS {
+            let prior = running
+                .fixture
+                .requests()
+                .await
+                .last()
+                .map(|request| request.ordinal)
+                .unwrap_or(0);
+            running.dispatch(case, command, id).await;
+            let expected = format!("Unknown command: {command}. Try /help");
+            let response = running
+                .fixture
+                .wait_for_request(command, |request| {
+                    request.ordinal > prior
+                        && is_output(case, request)
+                        && output_text(case, request).is_some_and(|text| text == expected)
+                })
+                .await?;
+            assert_routing(case, &response, id)?;
+        }
+        if case.kind == "slack" {
+            for &(id, _) in PICKER_DISABLED_COMMANDS {
+                running
+                    .fixture
+                    .wait_for_socket_input("Slack envelope acknowledgement", |value| {
+                        value["envelope_id"] == format!("slack-envelope-{id}")
+                    })
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+    .await;
+    let requests = running.cleanup().await;
+    result?;
+    let requests = requests?;
+    ensure!(
+        requests
+            .iter()
+            .filter(|request| is_output(case, request))
+            .count()
+            == PICKER_DISABLED_COMMANDS.len(),
+        "picker-disabled commands produced an unexpected outbound response count for {}: {requests:?}",
+        case.kind
+    );
+    let methods = rpc_audit(&root.path().join("rpc-audit.jsonl"), true)?;
+    ensure!(
+        !methods.iter().any(|request| matches!(
+            request["method"].as_str(),
+            Some("session/new" | "session/prompt")
+        )),
+        "picker-disabled commands unexpectedly opened or prompted an ACP session: {methods:?}"
+    );
+    Ok(())
+}
+
+async fn held_turn_cancellation(case: &ProtocolCase) -> Result<()> {
+    let (mut running, root) = RunningReplay::start_with_cancellable_hold(case).await?;
+    let result: Result<()> = async {
+        let prompt_id = 61;
+        let cancel_id = 62;
+        running.dispatch(case, "question", prompt_id).await;
+        let activity = running
+            .fixture
+            .wait_for_request("held prompt activity", |request| {
+                request.path.ends_with(case.activity_path)
+                    && output_text(case, request) == Some("> [read]")
+            })
+            .await?;
+        assert_activity_routing(case, &activity)?;
+        running.dispatch(case, "/cancel", cancel_id).await;
+        let cancellation = running
+            .fixture
+            .wait_for_request("cancellation acknowledgement", |request| {
+                request.ordinal > activity.ordinal
+                    && is_output(case, request)
+                    && output_text(case, request) == Some("Cancellation requested.")
+            })
+            .await?;
+        assert_routing(case, &cancellation, cancel_id)?;
+        if case.kind == "slack" {
+            for id in [prompt_id, cancel_id] {
+                running
+                    .fixture
+                    .wait_for_socket_input("Slack envelope acknowledgement", |value| {
+                        value["envelope_id"] == format!("slack-envelope-{id}")
+                    })
+                    .await?;
+            }
+        }
+        wait_for_file(
+            &root.path().join("rpc-audit.jsonl"),
+            "ACP cancellation audit",
+        )
+        .await?;
+        let methods = rpc_audit(&root.path().join("rpc-audit.jsonl"), false)?;
+        ensure!(
+            methods
+                .iter()
+                .filter(|request| request["method"] == "session/prompt")
+                .count()
+                == 1,
+            "held ingress must issue one ACP prompt before cancellation: {methods:?}"
+        );
+        ensure!(
+            methods
+                .iter()
+                .filter(|request| request["method"] == "session/cancel")
+                .count()
+                == 1,
+            "real ingress cancellation did not reach ACP exactly once: {methods:?}"
+        );
+        Ok(())
+    }
+    .await;
+    let requests = running.cleanup().await;
+    result?;
+    let requests = requests?;
+    ensure!(
+        requests
+            .iter()
+            .filter(|request| is_output(case, request))
+            .count()
+            == 2,
+        "held cancellation produced an unexpected outbound response count for {}: {requests:?}",
+        case.kind
+    );
+    ensure!(
+        !requests.iter().any(|request| {
+            is_output(case, request)
+                && output_text(case, request).is_some_and(|text| text.contains(HELD_TEXT))
+        }),
+        "held fixture emitted terminal text after cancellation for {}: {requests:?}",
+        case.kind
+    );
     Ok(())
 }
 
 async fn held_tool_activity(case: &ProtocolCase) -> Result<()> {
     let (mut running, root) = RunningReplay::start(case, true).await?;
-    let result = async {
+    let result: Result<()> = async {
         let id = 99;
         let prior = running
             .fixture
@@ -896,6 +1174,30 @@ async fn http_wire_replay_common_local_commands_use_real_ingress_and_outbound_ap
     assert_protocol_closure();
     for case in &PROTOCOLS {
         common_local_commands(case).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn http_wire_replay_advertised_controls_use_real_ingress_without_prompts() {
+    assert_protocol_closure();
+    for case in &PROTOCOLS {
+        advertised_controls(case).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn http_wire_replay_picker_disabled_commands_are_explicit_and_do_not_open_acp() {
+    assert_protocol_closure();
+    for case in &PROTOCOLS {
+        picker_disabled_commands(case).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn http_wire_replay_cancellation_reaches_acp_from_held_real_ingress() {
+    assert_protocol_closure();
+    for case in &PROTOCOLS {
+        held_turn_cancellation(case).await.unwrap();
     }
 }
 

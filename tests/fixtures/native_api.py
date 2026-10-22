@@ -290,7 +290,8 @@ class Api(http.server.BaseHTTPRequestHandler):
             elif parts[4] == 'compact':
                 assert body['delivery'] == 'queue'
                 session['compact'] = True
-                session['messages'].append({'id': body['id'], 'type': 'compaction', 'reason': 'manual', 'status': 'completed', 'summary': 'fixture summary'})
+                compaction_id = 'msg_unrelated_compaction' if os.environ.get('NATIVE_FIXTURE_COMPACT_WRONG_ID') else body['id']
+                session['messages'].append({'id': compaction_id, 'type': 'compaction', 'reason': 'manual', 'status': 'completed', 'summary': 'fixture summary'})
                 session['info']['time']['idle'] = time.time_ns()
                 session['info']['outcome'] = 'succeeded'
                 save()
