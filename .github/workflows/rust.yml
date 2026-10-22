@@ -22,3 +22,5 @@ jobs:
     # TypeScript checkout and Bun; it is not part of public/self-contained CI.
     - name: Run self-contained tests
       run: cargo test --locked --verbose
+    - name: Run optional local agent tools tests
+      run: cargo test --locked --features agent-network --verbose

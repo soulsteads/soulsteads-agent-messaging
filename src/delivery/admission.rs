@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConfiguredOwner {
     pub agent: AgentId,
+    pub name: String,
     pub platform: String,
     pub context: String,
     pub backend: String,
@@ -38,14 +39,16 @@ impl AdmissionConfig {
                 .as_object()
                 .ok_or_else(|| anyhow::anyhow!("agentMessaging owner must be an object"))?;
             let agent = required_agent(object.get("id"), "agentMessaging agent id")?;
-            if !["name", "label"].iter().any(|key| {
-                object
-                    .get(*key)
-                    .and_then(Value::as_str)
-                    .is_some_and(|value| !value.is_empty())
-            }) {
-                bail!("agentMessaging agent name or label is required");
-            }
+            let name = ["name", "label"]
+                .iter()
+                .find_map(|key| {
+                    object
+                        .get(*key)
+                        .and_then(Value::as_str)
+                        .filter(|s| !s.is_empty())
+                })
+                .ok_or_else(|| anyhow::anyhow!("agentMessaging agent name or label is required"))?
+                .to_owned();
             let target = object
                 .get("target")
                 .and_then(Value::as_object)
@@ -67,6 +70,7 @@ impl AdmissionConfig {
             }
             let configured = ConfiguredOwner {
                 agent: agent.clone(),
+                name,
                 platform: platform.clone(),
                 context: context.clone(),
                 backend,
@@ -93,6 +97,10 @@ impl AdmissionConfig {
             .get(&(platform.to_owned(), context.to_owned()))?;
         let owner = self.owners.get(agent)?;
         (owner.backend == backend).then_some(owner)
+    }
+
+    pub(crate) fn owners(&self) -> impl Iterator<Item = &ConfiguredOwner> {
+        self.owners.values()
     }
 
     pub(crate) fn owner(&self, agent: &AgentId) -> Option<&ConfiguredOwner> {

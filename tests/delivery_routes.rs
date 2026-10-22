@@ -152,10 +152,7 @@ async fn clear_revokes_an_old_context_before_reissuing_the_same_fixture_session_
     let send = PeerSend::new(AgentId::try_from("beta").unwrap(), "old-context", "data").unwrap();
 
     assert_eq!(old.send(send).await, Err(LocalRefusal::Denied));
-    assert_eq!(
-        current.list_visible().await,
-        Err(LocalRefusal::DurableUnavailable)
-    );
+    assert_eq!(current.list_visible().await.unwrap().len(), 1);
     bridge.shutdown().await.unwrap();
 }
 

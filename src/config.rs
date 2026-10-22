@@ -39,7 +39,22 @@ impl Loader {
                 load(&input, env)
                     .map_err(|_| anyhow::anyhow!("Cannot parse explicit configuration"))?
             }
-            Ok(input) => load(&input, env).unwrap_or_else(|_| defaults()),
+            Ok(input) => {
+                let opts_into_agent_tools = serde_json::from_str::<Value>(&input)
+                    .ok()
+                    .and_then(|value| {
+                        value
+                            .get("agentMessaging")
+                            .and_then(|value| value.get("tools"))
+                            .cloned()
+                    })
+                    .is_some();
+                if opts_into_agent_tools {
+                    load(&input, env)?
+                } else {
+                    load(&input, env).unwrap_or_else(|_| defaults())
+                }
+            }
             Err(_) if explicit => bail!("Cannot read explicit configuration"),
             Err(_) => defaults(),
         };
@@ -125,6 +140,39 @@ pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String
     Ok(())
 }
 
+pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
+    let Some(tools) = config
+        .get("agentMessaging")
+        .and_then(|value| value.get("tools"))
+    else {
+        return Ok(());
+    };
+    let tools = tools
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("agentMessaging.tools must be an object"))?;
+    let enabled = tools
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| anyhow::anyhow!("agentMessaging.tools.enabled must be a boolean"))?;
+    if enabled {
+        if config["agentMessaging"]["enabled"] != true {
+            bail!("agentMessaging.tools requires agentMessaging.enabled=true");
+        }
+        if tools.get("harness").and_then(Value::as_str) != Some("codex") {
+            bail!(
+                "agentMessaging.tools.harness must be explicitly set to \"codex\" when tools are enabled"
+            );
+        }
+    }
+    if tools
+        .keys()
+        .any(|key| !["enabled", "harness"].contains(&key.as_str()))
+    {
+        bail!("agentMessaging.tools contains an unsupported setting");
+    }
+    Ok(())
+}
+
 pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
     let mut supplied: Value = serde_json::from_str(input).unwrap_or_else(|_| serde_json::json!({}));
     if !supplied.is_object() {
@@ -146,6 +194,7 @@ pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
     substitute(&mut supplied, env);
     let mut value = defaults();
     merge(&mut value, supplied);
+    validate_agent_tools(&value)?;
     if value["matrix"].is_object() {
         if !value["matrix"]["showFullPaths"].is_boolean() {
             value["matrix"]["showFullPaths"] = false.into();

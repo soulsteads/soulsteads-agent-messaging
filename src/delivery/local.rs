@@ -26,9 +26,30 @@ pub enum ReplyOutcome {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RecordStatus {}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecipientState {
+    Attached,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 pub struct VisibleRecord {
     id: String,
+    name: String,
+    state: RecipientState,
+}
+
+impl VisibleRecord {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn state(&self) -> RecipientState {
+        self.state
+    }
 }
 
 #[derive(Clone)]
@@ -468,6 +489,33 @@ impl OwnerRegistry {
             .is_some_and(|owner| owner.allowed_senders.contains(sender))
     }
 
+    fn visible_recipients(
+        &self,
+        caller: &CallerContext,
+        store_path: &PathBuf,
+    ) -> Option<Vec<VisibleRecord>> {
+        if caller.source != SourceClass::HumanRoot || !self.current(caller, store_path) {
+            return None;
+        }
+        Some(
+            self.config
+                .owners()
+                .filter(|owner| {
+                    owner.agent != caller.agent && owner.allowed_senders.contains(&caller.agent)
+                })
+                .map(|owner| VisibleRecord {
+                    id: owner.agent.as_str().to_owned(),
+                    name: owner.name.clone(),
+                    state: if self.recipient_is_current(&owner.agent, store_path) {
+                        RecipientState::Attached
+                    } else {
+                        RecipientState::Unavailable
+                    },
+                })
+                .collect(),
+        )
+    }
+
     #[cfg(feature = "agent-network")]
     fn admit_direct(
         self: &Arc<Self>,
@@ -608,10 +656,9 @@ impl LocalClient {
         let Some(registry) = self.inner.registry.upgrade() else {
             return Err(LocalRefusal::NotVisible);
         };
-        if !registry.current(&self.inner.caller, &self.inner.store_path) {
-            return Err(LocalRefusal::NotVisible);
-        }
-        Err(LocalRefusal::DurableUnavailable)
+        registry
+            .visible_recipients(&self.inner.caller, &self.inner.store_path)
+            .ok_or(LocalRefusal::NotVisible)
     }
 
     pub async fn send(&self, send: PeerSend) -> Result<SendOutcome, LocalRefusal> {
@@ -714,14 +761,40 @@ mod tests {
                 "backend-id".into(),
                 "/trusted".into(),
                 "session-a".into(),
-                path,
+                path.clone(),
             )
             .unwrap();
 
+        let beta = registry
+            .issue(
+                "web",
+                "beta",
+                "opencode",
+                "backend-id".into(),
+                "/trusted".into(),
+                "session-b".into(),
+                path.clone(),
+            )
+            .unwrap();
+        store.set(entry("beta", "session-b"), true).unwrap();
+        let roster = alpha.list_visible().await.unwrap();
+        assert_eq!(roster.len(), 1);
+        assert_eq!(roster[0].id(), "beta");
+        assert_eq!(roster[0].name(), "Beta");
+        assert_eq!(roster[0].state(), RecipientState::Attached);
         assert_eq!(
-            alpha.list_visible().await,
-            Err(LocalRefusal::DurableUnavailable)
+            serde_json::to_value(&roster[0]).unwrap(),
+            json!({
+                "id": "beta", "name": "Beta", "state": "attached"
+            })
         );
+        assert_eq!(
+            beta.list_visible().await.unwrap(),
+            Vec::<VisibleRecord>::new()
+        );
+        registry.revoke("web", "beta");
+        let unavailable = alpha.list_visible().await.unwrap();
+        assert_eq!(unavailable[0].state(), RecipientState::Unavailable);
         assert_eq!(
             alpha.status("missing").await,
             Err(LocalRefusal::DurableUnavailable)
