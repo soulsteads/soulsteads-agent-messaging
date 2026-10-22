@@ -1,5 +1,5 @@
-use soulsteads_messaging::acp::{Client, Options};
 use serde_json::{Value, json};
+use soulsteads_messaging::acp::{Client, Options};
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
 fn options(directory: &Path) -> Options {
@@ -90,7 +90,16 @@ async fn codex_streaming_config_images_and_compaction_use_native_rpcs_without_lo
         "data:image/png;base64,eA=="
     );
     let response = client.prompt("/compact", vec![]).await.unwrap();
+    assert_eq!(response.text, "Context compacted");
+    assert_eq!(response.stop_reason.as_deref(), Some("end_turn"));
     assert!(response.output.had_tool_activity);
+    assert_eq!(
+        audit(directory.path())
+            .iter()
+            .filter(|request| request["method"] == "thread/compact/start")
+            .count(),
+        1
+    );
     assert_eq!(
         audit(directory.path())
             .iter()

@@ -158,6 +158,10 @@ pub fn run() {
                         );
                         current.remove(thread);
                     }
+                    "empty" => {
+                        finish(thread, &turn, "", "completed");
+                        current.remove(thread);
+                    }
                     "crash" => return,
                     "approve" => {
                         notification(
@@ -257,7 +261,25 @@ pub fn run() {
                 if let Ok(path) = std::env::var("CODEX_FIXTURE_COMPACT_MARKER") {
                     std::fs::write(path, "item completed; turn still active").unwrap();
                 }
-                std::thread::sleep(std::time::Duration::from_millis(250));
+                if std::env::var("CODEX_FIXTURE_COMPACT_FAILURE").as_deref() == Ok("true") {
+                    notification(
+                        "turn/completed",
+                        json!({"threadId":params["threadId"],"turn":{"id":turn,"status":"failed","items":[],"error":{"message":"Fixture compaction failed"}}}),
+                    );
+                    continue;
+                }
+                if let Ok(release) = std::env::var("CODEX_FIXTURE_COMPACT_RELEASE") {
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                    while !std::path::Path::new(&release).is_file() {
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "timed out waiting for compaction release"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                } else {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
                 notification(
                     "turn/completed",
                     json!({"threadId":params["threadId"],"turn":{"id":turn,"status":"completed","items":[],"error":null}}),
