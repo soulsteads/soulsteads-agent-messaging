@@ -664,7 +664,20 @@ impl State {
             self.release(&session, &turn).await;
         }
         match terminal? {
-            Terminal::Complete => Ok(json!({"stopReason":"end_turn"})),
+            Terminal::Complete => {
+                if compact {
+                    // Codex reports compaction as a completed context item with no
+                    // agent text. Present the acknowledgement only after its native
+                    // turn has reached the confirmed successful terminal state.
+                    text(
+                        self.client()?,
+                        id,
+                        "agent_message_chunk",
+                        "Context compacted",
+                    )?;
+                }
+                Ok(json!({"stopReason":"end_turn"}))
+            }
             Terminal::Cancelled => Ok(json!({"stopReason":"cancelled"})),
             Terminal::Error(error) => bail!(error),
         }
