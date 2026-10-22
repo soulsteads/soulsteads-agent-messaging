@@ -5,6 +5,9 @@ use crate::connectors::matrix_restart::{
 use crate::{
     backend::{Client, Options, Transport},
     config::{boolean, string, strings},
+    delivery::{
+        AdmissionConfig, AdmittedOrigin, ConversationKey, LocalClient, OwnerRegistry, SourceClass,
+    },
     store::{Entry, Store},
 };
 use anyhow::{Context, Result, bail};
@@ -209,6 +212,7 @@ struct PromptPresentation {
 struct ResolvedPrompt<'a> {
     text: &'a str,
     images: &'a [Value],
+    source: SourceClass,
     interaction: PromptInteraction,
     presentation: PromptPresentation,
 }
@@ -220,17 +224,61 @@ impl<'a> ResolvedPrompt<'a> {
         interaction: PromptInteraction,
         presentation: PromptPresentation,
     ) -> Self {
-        Self {
+        Self::bound(
+            SourceClass::HumanRoot,
             text,
             images,
             interaction,
             presentation,
+        )
+    }
+
+    fn bound(
+        source: SourceClass,
+        text: &'a str,
+        images: &'a [Value],
+        interaction: PromptInteraction,
+        mut presentation: PromptPresentation,
+    ) -> Self {
+        let interaction = if source.admits_human_brokers() {
+            interaction
+        } else {
+            presentation.live_updates = false;
+            presentation.tool_messages = Value::Null;
+            presentation.terminal_thread = Value::Null;
+            presentation.matrix_full_paths = false;
+            PromptInteraction {
+                permissions: false,
+                forms: false,
+                scope: None,
+            }
+        };
+        Self {
+            text,
+            images,
+            source,
+            interaction,
+            presentation,
         }
+    }
+
+    #[cfg(test)]
+    fn non_human_for_test(
+        source: SourceClass,
+        text: &'a str,
+        images: &'a [Value],
+        interaction: PromptInteraction,
+        presentation: PromptPresentation,
+    ) -> Self {
+        assert_ne!(source, SourceClass::HumanRoot);
+        Self::bound(source, text, images, interaction, presentation)
     }
 }
 #[async_trait]
 pub trait Sink: Send + Sync {
     async fn emit(&self, event: Value) -> Result<()>;
+    /// Trusted in-process hook issued only from an admitted human owner turn.
+    fn local_client(&self, _client: LocalClient) {}
     fn matrix_user_id(&self) -> Option<String> {
         None
     }
@@ -766,6 +814,7 @@ pub struct Bridge {
     restart_dispatcher: Arc<dyn RestartDispatcher>,
     permissions: crate::connectors::matrix_permissions::Broker,
     questions: crate::connectors::matrix_questions::Broker,
+    owner_registry: Option<Arc<OwnerRegistry>>,
 }
 impl Bridge {
     fn permission_scope(
@@ -873,6 +922,15 @@ impl Bridge {
         restart_dispatcher: Arc<dyn RestartDispatcher>,
     ) -> Result<Self> {
         normalize_agent_homes(&mut config, &env)?;
+        let owner_registry = AdmissionConfig::from_value(&config)?.map(|admission| {
+            OwnerRegistry::new(
+                admission,
+                config["acp"]["defaultBackend"]
+                    .as_str()
+                    .unwrap_or("opencode")
+                    .to_owned(),
+            )
+        });
         let path = string(&config, "sessionStorePath");
         if path.is_empty() {
             bail!("sessionStorePath is required");
@@ -891,6 +949,7 @@ impl Bridge {
             restart_dispatcher,
             permissions: Default::default(),
             questions: Default::default(),
+            owner_registry,
         })
     }
     pub fn context(&self, event: &Event) -> String {
@@ -935,6 +994,64 @@ impl Bridge {
             Err(_) => true,
         })
     }
+    async fn issue_local_client(
+        &self,
+        event: &Event,
+        context: &str,
+        backend: &str,
+        client: &Client,
+        sink: &dyn Sink,
+    ) {
+        let Some(registry) = &self.owner_registry else {
+            return;
+        };
+        let Ok(Some(entry)) = self.store.get(&event.platform, context, backend) else {
+            return;
+        };
+        let Ok(identity) = self.backend_identity(backend) else {
+            return;
+        };
+        if entry.backend_id != identity {
+            return;
+        }
+        let session_id = client.session_id().await;
+        if session_id.as_deref() != Some(entry.session_id.as_str())
+            || client.working_directory().to_string_lossy() != entry.cwd
+        {
+            return;
+        }
+        let Ok(conversation) = ConversationKey::new(&event.platform, context) else {
+            return;
+        };
+        let origin = AdmittedOrigin {
+            platform: event.platform.clone(),
+            conversation,
+            room: event.room.clone(),
+            event_thread: event.thread.clone(),
+            event_id: event.id.clone(),
+            reply_to: event.reply_to.clone(),
+            matrix_raw_thread: sink.matrix_raw_thread(),
+        };
+        if let Some(local) = registry.issue_human(
+            &event.platform,
+            context,
+            backend,
+            entry.backend_id,
+            entry.cwd,
+            entry.session_id,
+            self.store.0.clone(),
+            origin,
+        ) {
+            sink.local_client(local);
+        }
+    }
+
+    fn revoke_local_client(&self, platform: &str, context: &str) {
+        if let Some(registry) = &self.owner_registry {
+            registry.revoke(platform, context);
+        }
+    }
+
     async fn conversation(&self, platform: &str, context: &str) -> Result<Arc<ConversationSlot>> {
         let key = format!("{platform}\0{context}");
         let mut sessions = self.sessions.lock().await;
@@ -1890,6 +2007,7 @@ impl Bridge {
         if expected_identity.is_some_and(|expected| expected != identity) {
             bail!("Stored backend identity differs");
         }
+        self.revoke_local_client(&event.platform, context);
         let (client, identity) = self.launch(backend, Path::new(cwd)).await?;
         let publication = async {
             let mut unavailable = false;
@@ -2146,6 +2264,7 @@ impl Bridge {
                     .store
                     .get(&event.platform, context, &backend)?
                     .is_some();
+            self.revoke_local_client(&event.platform, context);
             if let Some(client) = state.client.take() {
                 let deletion = async {
                     if matches!(command.as_str(), "/clear" | "/reset") {
@@ -2241,6 +2360,9 @@ impl Bridge {
         {
             let _ = sink.emit(json!({"type":"thinking"})).await;
         }
+        if state.backend != backend {
+            self.revoke_local_client(&event.platform, context);
+        }
         let mut client = self
             .open(&event.platform, context, &backend, &mut state)
             .await?;
@@ -2305,6 +2427,8 @@ impl Bridge {
             sink.emit(json!({"type":"thinking"})).await?;
         }
         drop(state);
+        self.issue_local_client(event, context, &backend, &client, sink)
+            .await;
         let mut retried = false;
         let mut completion_guard = None;
         let (result, tool_results, observation, delivery) = loop {
@@ -2342,6 +2466,7 @@ impl Bridge {
                 {
                     if retried {
                         let mut state = conversation.lock().await;
+                        self.revoke_local_client(&event.platform, context);
                         self.store
                             .remove(&event.platform, context, Some(&backend))?;
                         if let Some(previous) = state.client.take() {
@@ -2369,6 +2494,7 @@ impl Bridge {
                     crate::debug_log::observation(&observation);
                     let _ = sink.emit(observation).await;
                     let mut state = conversation.lock().await;
+                    self.revoke_local_client(&event.platform, context);
                     self.store
                         .remove(&event.platform, context, Some(&backend))?;
                     if let Some(previous) = state.client.take() {
@@ -2379,6 +2505,9 @@ impl Bridge {
                         .open(&event.platform, context, &backend, &mut state)
                         .await?;
                     state.input_chars += event.text.encode_utf16().count();
+                    drop(state);
+                    self.issue_local_client(event, context, &backend, &client, sink)
+                        .await;
                     retried = true;
                     continue;
                 }
@@ -2459,6 +2588,7 @@ impl Bridge {
             let _ = sink.emit(observation).await;
             drop(completion_guard.take());
             let mut state = conversation.lock().await;
+            self.revoke_local_client(&event.platform, context);
             self.store
                 .remove(&event.platform, context, Some(&backend))?;
             if let Some(previous) = state.client.take() {
@@ -2469,6 +2599,9 @@ impl Bridge {
                 .open(&event.platform, context, &backend, &mut state)
                 .await?;
             state.input_chars += event.text.encode_utf16().count();
+            drop(state);
+            self.issue_local_client(event, context, &backend, &client, sink)
+                .await;
             retried = true;
         };
         let _completion_guard = completion_guard;
@@ -2591,6 +2724,17 @@ impl Bridge {
         sink: &dyn Sink,
     ) -> Result<(crate::acp::Response, String, bool, Value, InlineDelivery)> {
         use futures_util::{StreamExt, stream::FuturesUnordered};
+        if !submission.source.admits_human_brokers()
+            && (submission.interaction.permissions
+                || submission.interaction.forms
+                || submission.interaction.scope.is_some()
+                || submission.presentation.live_updates
+                || !submission.presentation.tool_messages.is_null()
+                || !submission.presentation.terminal_thread.is_null()
+                || submission.presentation.matrix_full_paths)
+        {
+            bail!("non-human prompt retained human interaction or presentation authority");
+        }
         let (mut permission_requests, _permission_guard) = if submission.interaction.permissions {
             let (requests, guard) = client.permission_handler();
             (Some(requests), Some(guard))
@@ -2878,6 +3022,7 @@ impl Bridge {
                 {
                     continue;
                 }
+                self.revoke_local_client(platform, context);
                 if let Err(error) = self.store.remove(platform, context, Some(&state.backend)) {
                     eprintln!("Session expiry mapping removal failed: {error}");
                     continue;
@@ -2894,6 +3039,9 @@ impl Bridge {
         Ok(expired)
     }
     pub async fn shutdown(&self) -> Result<()> {
+        if let Some(registry) = &self.owner_registry {
+            registry.revoke_all();
+        }
         let sessions = self
             .sessions
             .lock()
@@ -2978,8 +3126,46 @@ mod resolved_prompt_tests {
         );
         assert_eq!(submission.text, "ship the reviewed change");
         assert_eq!(submission.images, event.images.as_slice());
+        assert_eq!(submission.source, SourceClass::HumanRoot);
         assert!(submission.presentation.live_updates);
         assert_eq!(submission.presentation.platform, "matrix");
+    }
+
+    #[test]
+    fn non_human_resolved_prompt_strips_human_brokers_and_stream_output() {
+        let images = vec![json!({"type":"image","url":"mxc://example/image"})];
+        let submission = ResolvedPrompt::non_human_for_test(
+            SourceClass::PeerRequest,
+            "plain peer text",
+            &images,
+            PromptInteraction {
+                permissions: true,
+                forms: true,
+                scope: Some(crate::connectors::matrix_permissions::Scope {
+                    sender: "@human:example".into(),
+                    room: "!room:example".into(),
+                    thread: "$thread".into(),
+                    context: "matrix\0!room:example:$thread".into(),
+                    cwd: PathBuf::from("/workspace/project"),
+                }),
+            },
+            PromptPresentation {
+                live_updates: true,
+                tool_messages: json!({"tool_call":true}),
+                platform: "matrix".into(),
+                terminal_thread: json!(true),
+                matrix_full_paths: true,
+            },
+        );
+
+        assert_eq!(submission.source, SourceClass::PeerRequest);
+        assert!(!submission.interaction.permissions);
+        assert!(!submission.interaction.forms);
+        assert!(submission.interaction.scope.is_none());
+        assert!(!submission.presentation.live_updates);
+        assert_eq!(submission.presentation.tool_messages, Value::Null);
+        assert_eq!(submission.presentation.terminal_thread, Value::Null);
+        assert!(!submission.presentation.matrix_full_paths);
     }
 }
 pub fn session_dir(base: &Path, platform: &str, identifier: &str) -> PathBuf {
