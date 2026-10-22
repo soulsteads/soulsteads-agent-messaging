@@ -1,3 +1,5 @@
+#[cfg(feature = "agent-network")]
+use super::DirectRefusal;
 use super::{AgentId, ConversationKey, PeerSend, admission::AdmissionConfig};
 use crate::store::Store;
 use std::{
@@ -115,6 +117,43 @@ struct BindingSnapshot {
     cwd: String,
     session_id: String,
     generation: u64,
+}
+
+#[cfg(feature = "agent-network")]
+pub(crate) struct DirectAdmission {
+    registry: Arc<OwnerRegistry>,
+    caller: CallerContext,
+    store_path: PathBuf,
+    recipient: BindingSnapshot,
+}
+
+#[cfg(feature = "agent-network")]
+impl DirectAdmission {
+    pub(crate) fn matches_registry(&self, registry: &Arc<OwnerRegistry>) -> bool {
+        Arc::ptr_eq(&self.registry, registry)
+    }
+
+    pub(crate) fn is_current(&self) -> bool {
+        self.registry.current(&self.caller, &self.store_path)
+            && self
+                .registry
+                .sender_allowed(&self.caller.agent, &self.recipient.agent)
+            && self
+                .registry
+                .binding_current(&self.recipient, &self.store_path)
+    }
+
+    pub(crate) fn platform(&self) -> &str {
+        self.recipient.key.platform()
+    }
+
+    pub(crate) fn context(&self) -> &str {
+        self.recipient.key.context()
+    }
+
+    pub(crate) fn backend(&self) -> &str {
+        &self.recipient.backend
+    }
 }
 
 impl From<&OwnerBinding> for BindingSnapshot {
@@ -429,6 +468,30 @@ impl OwnerRegistry {
             .is_some_and(|owner| owner.allowed_senders.contains(sender))
     }
 
+    #[cfg(feature = "agent-network")]
+    fn admit_direct(
+        self: &Arc<Self>,
+        caller: &CallerContext,
+        store_path: &PathBuf,
+        recipient: &AgentId,
+    ) -> Option<DirectAdmission> {
+        if caller.source != SourceClass::HumanRoot
+            || caller.agent == *recipient
+            || !self.current(caller, store_path)
+            || !self.sender_allowed(&caller.agent, recipient)
+        {
+            return None;
+        }
+        let recipient = self.state.lock().ok()?.by_agent.get(recipient)?.clone();
+        let admission = DirectAdmission {
+            registry: self.clone(),
+            caller: caller.clone(),
+            store_path: store_path.clone(),
+            recipient: BindingSnapshot::from(&recipient),
+        };
+        admission.is_current().then_some(admission)
+    }
+
     fn prepare_return_route(
         &self,
         sender: &CallerContext,
@@ -528,6 +591,19 @@ pub struct LocalClient {
 }
 
 impl LocalClient {
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn admit_direct(
+        &self,
+        recipient: &AgentId,
+    ) -> Result<DirectAdmission, DirectRefusal> {
+        let Some(registry) = self.inner.registry.upgrade() else {
+            return Err(DirectRefusal::Denied);
+        };
+        registry
+            .admit_direct(&self.inner.caller, &self.inner.store_path, recipient)
+            .ok_or(DirectRefusal::Denied)
+    }
+
     pub async fn list_visible(&self) -> Result<Vec<VisibleRecord>, LocalRefusal> {
         let Some(registry) = self.inner.registry.upgrade() else {
             return Err(LocalRefusal::NotVisible);

@@ -301,7 +301,7 @@ mod retention_startup_tests {
         for raw in [None, Some("0"), Some("-15"), Some("1minutes")] {
             let directory = tempfile::Builder::new()
                 .prefix("retention-startup-")
-                .tempdir_in(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".build-tmp"))
+                .tempdir()
                 .unwrap();
             if let Some(raw) = raw {
                 std::fs::write(

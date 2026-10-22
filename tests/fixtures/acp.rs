@@ -244,6 +244,15 @@ fn main() {
                     if action["hold"] == true {
                         continue;
                     }
+                    if action["closeInput"] != true {
+                        if let Some(release) = action["releaseFile"].as_str() {
+                            std::fs::write(action["startedFile"].as_str().unwrap(), "started")
+                                .unwrap();
+                            while !std::path::Path::new(release).exists() {
+                                std::thread::sleep(std::time::Duration::from_millis(1));
+                            }
+                        }
+                    }
                     if let Some(request) = action.get("request") {
                         if request["method"] == "session/request_permission" {
                             assert!(

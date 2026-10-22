@@ -17,10 +17,9 @@ impl Sink for Recorder {
 
 #[tokio::test]
 async fn expiry_commits_exact_mapping_removal_and_preserves_workspace() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".build-tmp");
     let directory = tempfile::Builder::new()
         .prefix("expiry-runtime-")
-        .tempdir_in(root)
+        .tempdir()
         .unwrap();
     let configuration = config::load(
         &json!({"rateLimitSeconds":0,"sessionStorePath":directory.path().join("store.json"),"acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[]}}).to_string(),
@@ -77,10 +76,9 @@ async fn expiry_commits_exact_mapping_removal_and_preserves_workspace() {
 
 #[tokio::test]
 async fn selected_backend_expiry_and_reopen_preserve_independent_histories() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".build-tmp");
     let directory = tempfile::Builder::new()
         .prefix("expiry-backend-")
-        .tempdir_in(root)
+        .tempdir()
         .unwrap();
     let configuration = config::load(
         &json!({"rateLimitSeconds":0,"sessionStorePath":directory.path().join("store.json"),"acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[],"env":{"ACP_FIXTURE_MATRIX_AUDIT":directory.path().join("audit.jsonl")},"backends":{"codex":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[],"env":{"ACP_FIXTURE_MATRIX_AUDIT":directory.path().join("audit.jsonl")}}}}}).to_string(),

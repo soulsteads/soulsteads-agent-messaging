@@ -219,6 +219,82 @@ impl PeerSend {
     }
 }
 
+/// A bounded in-process request to one exact configured agent owner.
+///
+/// This request has no durable acceptance or idempotency guarantee.
+#[cfg(feature = "agent-network")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DirectRequest {
+    recipient: AgentId,
+    text: BoundedText,
+}
+
+#[cfg(feature = "agent-network")]
+impl DirectRequest {
+    pub fn new(recipient: AgentId, text: impl Into<String>) -> Result<Self, DeliveryContractError> {
+        Ok(Self {
+            recipient,
+            text: BoundedText::new(text)?,
+        })
+    }
+
+    pub fn recipient(&self) -> &AgentId {
+        &self.recipient
+    }
+
+    pub fn text(&self) -> &str {
+        self.text.as_str()
+    }
+}
+
+/// The terminal result of an in-process direct request.
+///
+/// The correlation ID is runtime-generated and is not a durable receipt.
+#[cfg(feature = "agent-network")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DirectResult {
+    correlation_id: uuid::Uuid,
+    text: String,
+    stop_reason: Option<String>,
+}
+
+#[cfg(feature = "agent-network")]
+impl DirectResult {
+    pub(crate) fn new(
+        correlation_id: uuid::Uuid,
+        text: String,
+        stop_reason: Option<String>,
+    ) -> Self {
+        Self {
+            correlation_id,
+            text,
+            stop_reason,
+        }
+    }
+
+    pub fn correlation_id(&self) -> uuid::Uuid {
+        self.correlation_id
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn stop_reason(&self) -> Option<&str> {
+        self.stop_reason.as_deref()
+    }
+}
+
+/// A fail-closed direct-request refusal.
+#[cfg(feature = "agent-network")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DirectRefusal {
+    Denied,
+    Unavailable,
+    Busy,
+    Uncertain,
+}
+
 /// Typed output that cannot be mistaken for peer input.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerOutput {

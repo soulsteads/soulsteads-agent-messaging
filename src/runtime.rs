@@ -2,6 +2,8 @@ use crate::connectors::matrix_restart::{
     MATRIX_RESTART_ACK, RestartDispatcher, SystemdUserRestart, has_restart_receipt,
     record_restart_receipt, resolve_restart_command,
 };
+#[cfg(feature = "agent-network")]
+use crate::delivery::{DirectAdmission, DirectRefusal, DirectRequest, DirectResult};
 use crate::{
     backend::{Client, Options, Transport},
     config::{boolean, string, strings},
@@ -21,6 +23,10 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
+#[cfg(feature = "agent-network")]
+use tokio::sync::oneshot;
+#[cfg(feature = "agent-network")]
+use uuid::Uuid;
 
 /// Startup-only minutes policy for the seven platform connectors.
 /// Slack defaults to 30 minutes; the others disable expiry on invalid input.
@@ -293,6 +299,17 @@ pub trait Sink: Send + Sync {
     }
 }
 
+#[cfg(feature = "agent-network")]
+struct InertSink;
+
+#[cfg(feature = "agent-network")]
+#[async_trait]
+impl Sink for InertSink {
+    async fn emit(&self, _event: Value) -> Result<()> {
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 struct InlineDelivery {
     attempted: std::collections::HashSet<String>,
@@ -449,6 +466,67 @@ struct MatrixAdmission {
     turn: Option<Arc<MatrixTurn>>,
     control_pending: bool,
     requests: usize,
+    direct_owner: bool,
+}
+
+#[cfg(feature = "agent-network")]
+struct DirectOwnerReservation {
+    conversation: Arc<ConversationSlot>,
+    released: bool,
+}
+
+#[cfg(feature = "agent-network")]
+impl DirectOwnerReservation {
+    fn reserve(conversation: Arc<ConversationSlot>) -> Result<Self, DirectRefusal> {
+        {
+            let mut admission = conversation
+                .matrix_admission
+                .lock()
+                .map_err(|_| DirectRefusal::Uncertain)?;
+            if admission.direct_owner
+                || admission.turn.is_some()
+                || admission.control_pending
+                || admission.requests != 0
+            {
+                return Err(DirectRefusal::Busy);
+            }
+            admission.direct_owner = true;
+        }
+        if conversation.try_lock().is_err() || conversation.expiry_cleanup.try_lock().is_err() {
+            conversation.matrix_admission.lock().unwrap().direct_owner = false;
+            return Err(DirectRefusal::Busy);
+        }
+        Ok(Self {
+            conversation,
+            released: false,
+        })
+    }
+
+    fn release_without_execution(&mut self) {
+        self.conversation
+            .matrix_admission
+            .lock()
+            .unwrap()
+            .direct_owner = false;
+        self.released = true;
+    }
+
+    fn release_after_terminal_result(&mut self) {
+        self.conversation
+            .matrix_admission
+            .lock()
+            .unwrap()
+            .direct_owner = false;
+        self.released = true;
+    }
+}
+
+#[cfg(feature = "agent-network")]
+impl Drop for DirectOwnerReservation {
+    fn drop(&mut self) {
+        // A dropped execution task has an unknown backend outcome. Keep the slot
+        // fenced rather than allowing another human or agent owner to overlap it.
+    }
 }
 struct RequestAdmissionGuard<'a>(&'a ConversationSlot);
 impl Drop for RequestAdmissionGuard<'_> {
@@ -1052,6 +1130,123 @@ impl Bridge {
         }
     }
 
+    #[cfg(feature = "agent-network")]
+    async fn attached_conversation(
+        &self,
+        platform: &str,
+        context: &str,
+    ) -> Option<Arc<ConversationSlot>> {
+        self.sessions
+            .lock()
+            .await
+            .get(&format!("{platform}\0{context}"))
+            .cloned()
+    }
+
+    /// Execute a sealed, in-process request against an already attached owner.
+    ///
+    /// No transport, durable acceptance, retry, or cancellation contract is implied.
+    #[cfg(feature = "agent-network")]
+    pub async fn direct_request(
+        self: &Arc<Self>,
+        caller: LocalClient,
+        request: DirectRequest,
+    ) -> Result<DirectResult, DirectRefusal> {
+        let admission = caller.admit_direct(request.recipient())?;
+        let Some(registry) = &self.owner_registry else {
+            return Err(DirectRefusal::Unavailable);
+        };
+        if !admission.matches_registry(registry) || !admission.is_current() {
+            return Err(DirectRefusal::Denied);
+        }
+        let Some(conversation) = self
+            .attached_conversation(admission.platform(), admission.context())
+            .await
+        else {
+            return Err(DirectRefusal::Unavailable);
+        };
+        let mut reservation = DirectOwnerReservation::reserve(conversation.clone())?;
+        if !admission.is_current() {
+            reservation.release_without_execution();
+            return Err(DirectRefusal::Denied);
+        }
+        let client = match conversation.try_lock() {
+            Ok(state) if state.backend == admission.backend() => state.client.clone(),
+            Ok(_) => None,
+            Err(_) => {
+                reservation.release_without_execution();
+                return Err(DirectRefusal::Busy);
+            }
+        };
+        let Some(client) = client else {
+            reservation.release_without_execution();
+            return Err(DirectRefusal::Unavailable);
+        };
+        let bridge = self.clone();
+        let text = request.text().to_owned();
+        let (sender, receiver) = oneshot::channel();
+        tokio::spawn(async move {
+            let result = bridge
+                .execute_direct(admission, conversation, client, text, reservation)
+                .await;
+            let _ = sender.send(result);
+        });
+        receiver.await.unwrap_or(Err(DirectRefusal::Uncertain))
+    }
+
+    #[cfg(feature = "agent-network")]
+    async fn execute_direct(
+        &self,
+        admission: DirectAdmission,
+        conversation: Arc<ConversationSlot>,
+        client: Client,
+        text: String,
+        mut reservation: DirectOwnerReservation,
+    ) -> Result<DirectResult, DirectRefusal> {
+        if !admission.is_current() {
+            reservation.release_without_execution();
+            return Err(DirectRefusal::Denied);
+        }
+        let submission = ResolvedPrompt::bound(
+            SourceClass::PeerRequest,
+            &text,
+            &[],
+            PromptInteraction {
+                permissions: false,
+                forms: false,
+                scope: None,
+            },
+            PromptPresentation {
+                live_updates: false,
+                tool_messages: Value::Null,
+                platform: String::new(),
+                terminal_thread: Value::Null,
+                matrix_full_paths: false,
+            },
+        );
+        let (response, _, _, _, _) = self
+            .prompt_attempt(&client, &submission, &InertSink)
+            .await
+            .map_err(|_| DirectRefusal::Uncertain)?;
+        // This recheck is the terminal ownership decision: a revocation observed
+        // here makes the already-completed backend outcome uncertain. A later
+        // revocation is ordered after this decision and cannot retract the result.
+        if !admission.is_current() {
+            reservation.release_after_terminal_result();
+            return Err(DirectRefusal::Uncertain);
+        }
+        {
+            let mut state = conversation.lock().await;
+            state.message_count += 1;
+            state.input_chars += text.encode_utf16().count();
+            state.output_chars += response.text.encode_utf16().count();
+            state.last_activity = Instant::now();
+        }
+        let result = DirectResult::new(Uuid::new_v4(), response.text, response.stop_reason);
+        reservation.release_after_terminal_result();
+        Ok(result)
+    }
+
     async fn conversation(&self, platform: &str, context: &str) -> Result<Arc<ConversationSlot>> {
         let key = format!("{platform}\0{context}");
         let mut sessions = self.sessions.lock().await;
@@ -1267,6 +1462,11 @@ impl Bridge {
             conversation.matrix_admission.lock().unwrap().requests += 1;
             RequestAdmissionGuard(&conversation)
         };
+        if conversation.matrix_admission.lock().unwrap().direct_owner {
+            return sink
+                .emit(json!({"type":"notice","text":"An agent request is already running. Please wait."}))
+                .await;
+        }
         let command = event
             .text
             .split_whitespace()
@@ -3018,7 +3218,10 @@ impl Bridge {
                 let Ok(admission) = session.matrix_admission.try_lock() else {
                     continue;
                 };
-                if admission.turn.is_some() || admission.control_pending || admission.requests != 0
+                if admission.direct_owner
+                    || admission.turn.is_some()
+                    || admission.control_pending
+                    || admission.requests != 0
                 {
                     continue;
                 }

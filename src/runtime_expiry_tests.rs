@@ -1,5 +1,7 @@
 use super::*;
 use crate::config;
+#[cfg(feature = "agent-network")]
+use crate::delivery::{AgentId, DirectRefusal, DirectRequest, LocalClient};
 
 #[test]
 fn retention_policy_parser_matches_executed_pinned_source() {
@@ -193,7 +195,7 @@ impl Sink for Recorder {
 fn fixture() -> (tempfile::TempDir, Bridge) {
     let directory = tempfile::Builder::new()
         .prefix("expiry-private-")
-        .tempdir_in(Path::new(env!("CARGO_MANIFEST_DIR")).join(".build-tmp"))
+        .tempdir()
         .unwrap();
     let executable = std::env::current_exe().unwrap();
     let command = executable
@@ -253,6 +255,138 @@ async fn pending_matrix_control_blocks_expiry() {
     bridge.shutdown().await.unwrap();
     assert_eq!(expired, 0, "admitted session controls must exclude expiry");
     assert!(alive);
+}
+
+#[cfg(feature = "agent-network")]
+#[tokio::test]
+async fn reserved_direct_owner_blocks_expiry_before_backend_prompt_starts() {
+    let (_directory, bridge) = fixture();
+    let slot = open_stale(&bridge, "web", "reserved-direct-owner").await;
+    let mut reservation = DirectOwnerReservation::reserve(slot.clone()).unwrap();
+
+    assert_eq!(bridge.expire(Duration::from_secs(60)).await.unwrap(), 0);
+    assert!(slot.lock().await.client.is_some());
+    assert!(
+        bridge
+            .store
+            .get("web", "reserved-direct-owner", "opencode")
+            .unwrap()
+            .is_some()
+    );
+
+    reservation.release_without_execution();
+    bridge.shutdown().await.unwrap();
+}
+
+#[cfg(feature = "agent-network")]
+#[derive(Default)]
+struct DirectRecorder {
+    local: std::sync::Mutex<Vec<LocalClient>>,
+}
+
+#[cfg(feature = "agent-network")]
+#[async_trait::async_trait]
+impl Sink for DirectRecorder {
+    async fn emit(&self, _event: Value) -> Result<()> {
+        Ok(())
+    }
+
+    fn local_client(&self, client: LocalClient) {
+        self.local.lock().unwrap().push(client);
+    }
+}
+
+#[cfg(feature = "agent-network")]
+fn direct_fixture() -> (tempfile::TempDir, Arc<Bridge>, DirectRecorder, PathBuf) {
+    let directory = tempfile::Builder::new()
+        .prefix("direct-terminal-private-")
+        .tempdir()
+        .unwrap();
+    let started = directory.path().join("direct-started");
+    let release = directory.path().join("direct-release");
+    std::fs::write(
+        directory.path().join("script.json"),
+        json!([
+            {"text":"beta warm","stopReason":"end_turn"},
+            {"text":"alpha warm","stopReason":"end_turn"},
+            {"startedFile":started,"releaseFile":release,"text":"terminal answer","stopReason":"end_turn"}
+        ])
+        .to_string(),
+    )
+    .unwrap();
+    let executable = std::env::current_exe().unwrap();
+    let command = executable
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("acp-fixture");
+    assert!(command.is_file());
+    let configuration = config::load(
+        &json!({
+            "rateLimitSeconds":0,
+            "sessionStorePath":directory.path().join("store.json"),
+            "acp":{"command":command,"args":[],"env":{
+                "ACP_FIXTURE_MATRIX_SCRIPT":directory.path().join("script.json"),
+                "ACP_FIXTURE_MATRIX_COUNTER":directory.path().join("counter")
+            }},
+            "agentMessaging":{"enabled":true,"agents":[
+                {"id":"alpha","name":"Alpha","target":{"platform":"web","context":"alpha-room","backend":"opencode"},"allowedSenders":[]},
+                {"id":"beta","name":"Beta","target":{"platform":"web","context":"beta-room","backend":"opencode"},"allowedSenders":["alpha"]}
+            ]}
+        })
+        .to_string(),
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    (
+        directory,
+        Arc::new(Bridge::new(configuration, BTreeMap::new(), PathBuf::new()).unwrap()),
+        DirectRecorder::default(),
+        release,
+    )
+}
+
+#[cfg(feature = "agent-network")]
+#[tokio::test]
+async fn shutdown_revocation_during_direct_terminal_response_is_uncertain() {
+    let (directory, bridge, sink, release) = direct_fixture();
+    bridge
+        .handle_web(Event::web("beta-room", "warm beta"), &sink)
+        .await
+        .unwrap();
+    bridge
+        .handle_web(Event::web("alpha-room", "warm alpha"), &sink)
+        .await
+        .unwrap();
+    let alpha = sink.local.lock().unwrap()[1].clone();
+    let requesting_bridge = bridge.clone();
+    let request = tokio::spawn(async move {
+        requesting_bridge
+            .direct_request(
+                alpha,
+                DirectRequest::new(AgentId::try_from("beta").unwrap(), "finish direct").unwrap(),
+            )
+            .await
+    });
+    let started = directory.path().join("direct-started");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while !started.exists() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+
+    bridge.owner_registry.as_ref().unwrap().revoke_all();
+    std::fs::write(release, "release").unwrap();
+    let outcome = tokio::time::timeout(Duration::from_secs(3), request)
+        .await
+        .unwrap()
+        .unwrap();
+    bridge.shutdown().await.unwrap();
+
+    assert_eq!(outcome, Err(DirectRefusal::Uncertain));
 }
 
 async fn start_mirror(bridge: &Bridge, slot: &ConversationSlot, context: &str, sink: &Recorder) {
