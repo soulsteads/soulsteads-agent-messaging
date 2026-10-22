@@ -1,11 +1,11 @@
 #![cfg(feature = "platform-sdks")]
 use axum::{Json, Router, extract::Request, routing::any};
+use futures_util::StreamExt;
 use soulsteads_messaging::{
     config,
     connectors::{matrix, whatsapp},
     runtime::Bridge,
 };
-use futures_util::StreamExt;
 
 #[test]
 fn whatsapp_pairing_qr_is_local_private_svg_without_token_text() {
@@ -732,6 +732,66 @@ async fn matrix_source_thread_isolation_off_and_reply_fallback_context() {
             );
         }
     }
+}
+
+#[tokio::test]
+async fn matrix_sdk_sync_retains_source_thread_through_tool_updates_and_terminal_response() {
+    let state = matrix_runtime_case(
+        MatrixFixture {
+            body: "!oc tools".into(),
+            content: json!({
+                "m.relates_to": {
+                    "rel_type": "m.thread",
+                    "event_id": "$root",
+                    "m.in_reply_to": {"event_id": "$last"}
+                }
+            }),
+            ..Default::default()
+        },
+        json!({"mode":"trace","showArguments":true}),
+        json!({"threadIsolation":true}),
+        Some("done"),
+    )
+    .await;
+    let sent = state.sent.lock().await;
+    let activity_index = sent
+        .iter()
+        .position(|message| {
+            message["msgtype"] == "m.notice"
+                && message["m.relates_to"]["rel_type"] == "m.thread"
+                && message["m.relates_to"]["event_id"] == "$root"
+        })
+        .expect("real sync tool activity must retain the source thread root");
+    assert_eq!(
+        sent[activity_index]["m.relates_to"]["m.in_reply_to"]["event_id"],
+        "$initial"
+    );
+    let activity_id = format!("$outbound-{}", activity_index + 1);
+    let replacements: Vec<_> = sent
+        .iter()
+        .enumerate()
+        .skip(activity_index + 1)
+        .filter(|(_, message)| {
+            message["m.relates_to"]["rel_type"] == "m.replace"
+                && message["m.relates_to"]["event_id"] == activity_id
+        })
+        .collect();
+    assert!(
+        !replacements.is_empty(),
+        "tool activity was not replaced after its initial send: {sent:?}"
+    );
+    assert!(replacements.iter().all(|(_, message)| {
+        message["m.new_content"]["msgtype"] == "m.notice"
+            && message["m.new_content"].get("m.relates_to").is_none()
+    }));
+    let terminal = sent.last().expect("terminal response must be sent");
+    assert_eq!(terminal["body"], "done");
+    assert_eq!(terminal["m.relates_to"]["rel_type"], "m.thread");
+    assert_eq!(terminal["m.relates_to"]["event_id"], "$root");
+    assert_eq!(
+        terminal["m.relates_to"]["m.in_reply_to"]["event_id"],
+        activity_id
+    );
 }
 
 #[tokio::test]

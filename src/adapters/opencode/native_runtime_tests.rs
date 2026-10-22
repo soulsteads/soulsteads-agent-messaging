@@ -570,6 +570,25 @@ async fn native_compaction_uses_native_control_not_an_ordinary_prompt() {
 }
 
 #[tokio::test]
+async fn native_compaction_refuses_unrelated_durable_completion() {
+    let root = tempfile::tempdir().unwrap();
+    let mut config = options(root.path());
+    config
+        .env
+        .insert("NATIVE_FIXTURE_COMPACT_WRONG_ID".into(), "1".into());
+    let client = Client::connect(Transport::OpenCodeNative, config, vec![])
+        .await
+        .unwrap();
+    client.new_session().await.unwrap();
+    let response = client.prompt("/compact", vec![]).await;
+    client.shutdown().await.unwrap();
+    assert!(
+        response.is_err(),
+        "an unrelated compaction record cannot acknowledge this request: {response:?}"
+    );
+}
+
+#[tokio::test]
 async fn native_terminal_snapshot_validates_tool_media_before_completion() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("release"), "").unwrap();

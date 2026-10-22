@@ -41,18 +41,24 @@ impl Sink for WhatsAppSink {
         Ok(())
     }
     async fn emit(&self, event: Value) -> Result<()> {
-        if matches!(
-            event["type"].as_str(),
-            Some("response" | "error" | "permission_denied" | "activity")
-        ) && let Some(text) = event["text"]
-            .as_str()
-            .or(event["message"].as_str())
-            .filter(|text| !text.is_empty())
-        {
+        if let Some(text) = reply_text(&event) {
             self.0.reply(text).await?;
         }
         Ok(())
     }
+}
+
+fn reply_text(event: &Value) -> Option<&str> {
+    if !matches!(
+        event["type"].as_str(),
+        Some("response" | "error" | "permission_denied" | "activity")
+    ) {
+        return None;
+    }
+    event["text"]
+        .as_str()
+        .or(event["message"].as_str())
+        .filter(|text| !text.is_empty())
 }
 
 pub fn media_message(
@@ -96,6 +102,43 @@ pub fn media_message(
             ..Default::default()
         }
     }
+}
+
+/// Normalizes an SDK message and its parsed metadata into the bridge event.
+///
+/// This deliberately accepts the SDK's message and info types rather than a
+/// `MessageContext`: creating a context requires an SDK client, which the
+/// normalization itself does not use.
+pub(crate) fn event_from_message(
+    message: &whatsapp_rust::waproto::whatsapp::Message,
+    info: &whatsapp_rust::wacore::types::message::MessageInfo,
+    respond_to_others: bool,
+) -> Option<Event> {
+    let source = &info.source;
+    let self_chat = source.is_from_me && !source.is_group && source.chat.user == source.sender.user;
+    if source.is_from_me && !self_chat || !source.is_from_me && !respond_to_others {
+        return None;
+    }
+    let text = message.conversation.as_deref().or_else(|| {
+        message
+            .extended_text_message
+            .as_option()
+            .and_then(|message| message.text.as_deref())
+    })?;
+
+    Some(Event {
+        platform: "whatsapp".into(),
+        room: source.chat.to_string(),
+        thread: String::new(),
+        id: info.id.clone(),
+        user: source.sender.user.to_string(),
+        text: text.into(),
+        direct: self_chat,
+        mentioned: text.trim().starts_with('/'),
+        bot: false,
+        images: vec![],
+        reply_to: None,
+    })
 }
 
 pub async fn build(config: &Value, bridge: Arc<Bridge>) -> Result<Bot> {
@@ -146,34 +189,10 @@ async fn build_inner<Factory: whatsapp_rust::transport::TransportFactory + 'stat
                 let Ok(_permit) = permits.try_acquire_owned() else {
                     return;
                 };
-                let source = &context.info.source;
-                let self_chat =
-                    source.is_from_me && !source.is_group && source.chat.user == source.sender.user;
-                if source.is_from_me && !self_chat || !source.is_from_me && !respond_to_others {
+                let Some(event) =
+                    event_from_message(&context.message, &context.info, respond_to_others)
+                else {
                     return;
-                }
-                let text = context.message.conversation.as_deref().or_else(|| {
-                    context
-                        .message
-                        .extended_text_message
-                        .as_option()
-                        .and_then(|message| message.text.as_deref())
-                });
-                let Some(text) = text else {
-                    return;
-                };
-                let event = Event {
-                    platform: "whatsapp".into(),
-                    room: source.chat.to_string(),
-                    thread: String::new(),
-                    id: context.info.id.clone(),
-                    user: source.sender.user.to_string(),
-                    text: text.into(),
-                    direct: self_chat,
-                    mentioned: text.trim().starts_with('/'),
-                    bot: false,
-                    images: vec![],
-                    reply_to: None,
                 };
                 let sink = WhatsAppSink(context);
                 let _ = bridge.handle(event, &sink).await;
@@ -190,4 +209,243 @@ pub async fn run(bot: Bot, mut shutdown: tokio::sync::watch::Receiver<bool>) -> 
     tokio::pin!(running);
     tokio::select! {_=shutdown.changed()=>client.disconnect().await,()=&mut running=>{}}
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{event_from_message, reply_text};
+    use serde_json::json;
+    use whatsapp_rust::{
+        wacore::types::message::{MessageInfo, MessageSource},
+        waproto::whatsapp as wa,
+    };
+
+    fn info(is_from_me: bool, is_group: bool, chat: &str, sender: &str) -> MessageInfo {
+        MessageInfo {
+            source: MessageSource {
+                chat: chat.parse().expect("valid SDK chat JID"),
+                sender: sender.parse().expect("valid SDK sender JID"),
+                is_from_me,
+                is_group,
+                ..Default::default()
+            },
+            id: "message-id".into(),
+            ..Default::default()
+        }
+    }
+
+    fn conversation(text: &str) -> wa::Message {
+        wa::Message {
+            conversation: Some(text.into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn reply_text_maps_supported_outbound_event_types() {
+        for kind in ["response", "error", "permission_denied", "activity"] {
+            let event = json!({"type": kind, "text": "reply"});
+
+            assert_eq!(reply_text(&event), Some("reply"), "type={kind}");
+        }
+    }
+
+    #[test]
+    fn reply_text_ignores_non_reply_outbound_event_types() {
+        for kind in ["chunk", "tool", "reasoning", "done"] {
+            let event = json!({"type": kind, "text": "not a reply"});
+
+            assert_eq!(reply_text(&event), None, "type={kind}");
+        }
+    }
+
+    #[test]
+    fn reply_text_uses_message_only_when_text_is_not_a_string() {
+        assert_eq!(
+            reply_text(&json!({"type": "response", "message": "fallback"})),
+            Some("fallback")
+        );
+        assert_eq!(
+            reply_text(&json!({"type": "response", "text": "preferred", "message": "fallback"})),
+            Some("preferred")
+        );
+        assert_eq!(
+            reply_text(&json!({"type": "response", "text": "", "message": "fallback"})),
+            None,
+            "an empty text string remains selected and is filtered rather than falling back"
+        );
+    }
+
+    #[test]
+    fn normalizes_incoming_conversation_text_when_others_are_enabled() {
+        let event = event_from_message(
+            &conversation("hello"),
+            &info(
+                false,
+                false,
+                "15550000001@s.whatsapp.net",
+                "15550000001@s.whatsapp.net",
+            ),
+            true,
+        )
+        .expect("allowed incoming text maps to an event");
+
+        assert_eq!(event.platform, "whatsapp");
+        assert_eq!(event.room, "15550000001@s.whatsapp.net");
+        assert_eq!(event.thread, "");
+        assert_eq!(event.id, "message-id");
+        assert_eq!(event.user, "15550000001");
+        assert_eq!(event.text, "hello");
+        assert!(!event.direct);
+        assert!(!event.mentioned);
+        assert!(!event.bot);
+        assert!(event.images.is_empty());
+        assert_eq!(event.reply_to, None);
+    }
+
+    #[test]
+    fn normalizes_extended_text_when_conversation_is_absent() {
+        let message = wa::Message {
+            extended_text_message: wa::message::ExtendedTextMessage {
+                text: Some("expanded".into()),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+
+        let event = event_from_message(
+            &message,
+            &info(
+                false,
+                false,
+                "15550000001@s.whatsapp.net",
+                "15550000001@s.whatsapp.net",
+            ),
+            true,
+        )
+        .expect("extended text maps to an event");
+
+        assert_eq!(event.text, "expanded");
+    }
+
+    #[test]
+    fn marks_slash_command_text_as_mentioned() {
+        let event = event_from_message(
+            &conversation("  /help"),
+            &info(
+                false,
+                false,
+                "15550000001@s.whatsapp.net",
+                "15550000001@s.whatsapp.net",
+            ),
+            true,
+        )
+        .expect("allowed command maps to an event");
+
+        assert!(event.mentioned);
+    }
+
+    #[test]
+    fn maps_outgoing_self_chat_as_direct() {
+        let event = event_from_message(
+            &conversation("note to self"),
+            &info(
+                true,
+                false,
+                "15550000001@s.whatsapp.net",
+                "15550000001@s.whatsapp.net",
+            ),
+            false,
+        )
+        .expect("self chat is accepted regardless of respondToOthers");
+
+        assert!(event.direct);
+        assert_eq!(event.text, "note to self");
+    }
+
+    #[test]
+    fn rejects_incoming_text_when_others_are_disabled() {
+        assert!(
+            event_from_message(
+                &conversation("hello"),
+                &info(
+                    false,
+                    false,
+                    "15550000001@s.whatsapp.net",
+                    "15550000001@s.whatsapp.net"
+                ),
+                false,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_outgoing_other_chat() {
+        assert!(
+            event_from_message(
+                &conversation("outbound"),
+                &info(
+                    true,
+                    false,
+                    "15550000002@s.whatsapp.net",
+                    "15550000001@s.whatsapp.net"
+                ),
+                true,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_outgoing_group_even_when_sender_matches_chat_user() {
+        assert!(
+            event_from_message(
+                &conversation("outbound group"),
+                &info(
+                    true,
+                    true,
+                    "120363021033254949@g.us",
+                    "120363021033254949@g.us"
+                ),
+                true,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_non_text_messages() {
+        assert!(
+            event_from_message(
+                &wa::Message::default(),
+                &info(
+                    false,
+                    false,
+                    "15550000001@s.whatsapp.net",
+                    "15550000001@s.whatsapp.net"
+                ),
+                true,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn preserves_empty_text_as_an_event() {
+        let event = event_from_message(
+            &conversation(""),
+            &info(
+                false,
+                false,
+                "15550000001@s.whatsapp.net",
+                "15550000001@s.whatsapp.net",
+            ),
+            true,
+        )
+        .expect("existing mapping accepts empty conversation text");
+
+        assert_eq!(event.text, "");
+    }
 }

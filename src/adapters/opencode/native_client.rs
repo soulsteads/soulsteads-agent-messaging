@@ -332,6 +332,11 @@ impl Client {
             .as_array()
             .context("Invalid native commands catalog")?
             .clone();
+        // Compaction is implemented by this adapter, not the server's dynamic
+        // command endpoint. Advertise it so public ingress can admit it too.
+        if !state.commands.iter().any(|command| command["name"] == "compact") {
+            state.commands.push(serde_json::json!({"name":"compact","description":"Compact conversation context"}));
+        }
         state.model = selected;
         state.agent = info["agent"].as_str().unwrap_or("").into();
         Ok::<_, anyhow::Error>(())
@@ -906,20 +911,19 @@ impl Client {
             {
                 return Ok(None);
             }
-            let completed = rows
-                .iter()
-                .filter(|row| {
-                    !state.baseline.contains(row["id"].as_str().unwrap_or(""))
+            if state.compactions.iter().any(|id| {
+                !rows.iter().any(|row| {
+                    row["id"] == *id
+                        && !state.baseline.contains(id)
                         && row["type"] == "compaction"
                         && row["reason"] == "manual"
                         && row["status"] == "completed"
                 })
-                .count();
-            if completed < state.compactions.len() {
+            }) {
                 bail!("Native compaction completion was not confirmed by durable history");
             }
         }
-        let text: String = rows
+        let mut text: String = rows
             .iter()
             .filter(|row| {
                 !state.baseline.contains(row["id"].as_str().unwrap_or(""))
@@ -927,6 +931,11 @@ impl Client {
             })
             .map(message_text)
             .collect();
+        if text.is_empty() && !state.compactions.is_empty() {
+            // Reached only after successful idle state and durable manual
+            // compaction confirmation; ordinary empty prompts stay empty.
+            text = "Context compacted".into();
+        }
         state.output.raw_chars = text.encode_utf16().count();
         state.stop = Some("end_turn".into());
         drop(state);
