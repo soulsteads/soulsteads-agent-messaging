@@ -44,7 +44,11 @@ choose, using your own chat account and the agent you already have signed in.
 **Optional local agent tools:** With the `agent-network` build feature and an
 explicit runtime opt-in, a configured Codex or OpenCode conversation can list permitted peers
 and ask an already-attached agent a question. This is a bounded local exchange,
-not a remote agent network or queued-delivery service. See [local agent tools](docs/AGENT-TOOLS.md).
+not a remote agent network or queued-delivery service. Direct peer prompts include
+an authenticated sender/recipient context envelope; request text is retained as
+escaped peer data labelled separately from operator/system instructions. The envelope is
+context, not a security sandbox, and the existing 64 KiB request limit is unchanged.
+See [local agent tools](docs/AGENT-TOOLS.md) and [API qualification limits](docs/API-QUALIFICATION.md).
 
 ---
 
