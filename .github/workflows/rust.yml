@@ -8,17 +8,32 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "2"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUST_TEST_THREADS: "1"
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
+    - name: Runner resources before compilation
+      run: |
+        df -h . /tmp
+        free -h
     - name: Build
       run: cargo build --locked --verbose
     # The optional reference-conformance feature requires a separately supplied
     # TypeScript checkout and Bun; it is not part of public/self-contained CI.
     - name: Run self-contained tests
       run: cargo test --locked --verbose
+    - name: Run optional local agent tools tests
+      run: cargo test --locked --features agent-network --verbose
+    - name: Runner resources after qualification
+      if: always()
+      run: |
+        df -h . /tmp
+        free -h

@@ -1,10 +1,10 @@
 use anyhow::{Context, Result, bail};
+use clap::Parser;
 use soulsteads_messaging::{
     config::{self, boolean, string},
     connectors::http::Platform,
     runtime::{Bridge, Event, SessionRetentionPolicy},
 };
-use clap::Parser;
 use std::{
     collections::BTreeMap,
     path::PathBuf,
@@ -72,6 +72,7 @@ async fn start() -> Result<()> {
         println!("Configuration loaded successfully; no connectors started.");
         return Ok(());
     }
+    bridge.prepare_agent_tools().await?;
     if !arguments.serve {
         let console = Console::new(!arguments.no_images);
         if !arguments.prompt.is_empty() {
@@ -150,7 +151,8 @@ async fn start() -> Result<()> {
                 .context("Invalid web port")?
         );
         let listener = tokio::net::TcpListener::bind(address).await?;
-        let router = soulsteads_messaging::web::router(bridge.clone(), configuration["web"].clone());
+        let router =
+            soulsteads_messaging::web::router(bridge.clone(), configuration["web"].clone());
         let mut receiver = receiver.clone();
         tasks.spawn(async move {
             axum::serve(listener, router)
@@ -178,19 +180,23 @@ async fn start() -> Result<()> {
                     .get("MATRIX_STORAGE_PATH")
                     .map(PathBuf::from)
                     .unwrap_or_else(|| home.join(".local/share/opencode-matrix-bot"));
-                let client =
-                    soulsteads_messaging::connectors::matrix::connect(&configuration[platform], &storage)
-                        .await?;
+                let client = soulsteads_messaging::connectors::matrix::connect(
+                    &configuration[platform],
+                    &storage,
+                )
+                .await?;
                 tasks.spawn(async move {
                     soulsteads_messaging::connectors::matrix::run(client, bridge, receiver).await
                 });
             } else {
-                let bot =
-                    soulsteads_messaging::connectors::whatsapp::build(&configuration[platform], bridge)
-                        .await?;
-                tasks.spawn(
-                    async move { soulsteads_messaging::connectors::whatsapp::run(bot, receiver).await },
-                );
+                let bot = soulsteads_messaging::connectors::whatsapp::build(
+                    &configuration[platform],
+                    bridge,
+                )
+                .await?;
+                tasks.spawn(async move {
+                    soulsteads_messaging::connectors::whatsapp::run(bot, receiver).await
+                });
             }
         }
     }
@@ -285,8 +291,8 @@ async fn shutdown_signal() -> std::io::Result<()> {
 #[cfg(test)]
 mod retention_startup_tests {
     use super::*;
-    use soulsteads_messaging::{runtime::Sink, store::Store};
     use serde_json::{Value, json};
+    use soulsteads_messaging::{runtime::Sink, store::Store};
 
     struct Recorder;
     #[async_trait::async_trait]

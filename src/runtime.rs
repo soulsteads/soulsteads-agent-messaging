@@ -6,7 +6,7 @@ use crate::connectors::matrix_restart::{
 use crate::delivery::{DirectAdmission, DirectRefusal, DirectRequest, DirectResult};
 use crate::{
     backend::{Client, Options, Transport},
-    config::{boolean, string, strings},
+    config::{boolean, string, strings, validate_agent_tools},
     delivery::{
         AdmissionConfig, AdmittedOrigin, ConversationKey, LocalClient, OwnerRegistry, SourceClass,
     },
@@ -434,6 +434,8 @@ struct Conversation {
     picker: Vec<Value>,
     selected_cwd: Option<String>,
     mirror: Option<Mirror>,
+    #[cfg(feature = "agent-network")]
+    agent_tools: Option<Arc<crate::delivery::agent_tools::AgentToolSession>>,
 }
 #[derive(Default)]
 struct ConversationSlot {
@@ -796,6 +798,8 @@ impl Default for Conversation {
             picker: vec![],
             selected_cwd: None,
             mirror: None,
+            #[cfg(feature = "agent-network")]
+            agent_tools: None,
         }
     }
 }
@@ -893,6 +897,8 @@ pub struct Bridge {
     permissions: crate::connectors::matrix_permissions::Broker,
     questions: crate::connectors::matrix_questions::Broker,
     owner_registry: Option<Arc<OwnerRegistry>>,
+    #[cfg(feature = "agent-network")]
+    agent_tools: std::sync::OnceLock<std::sync::Weak<Bridge>>,
 }
 impl Bridge {
     fn permission_scope(
@@ -999,7 +1005,12 @@ impl Bridge {
         workspace: PathBuf,
         restart_dispatcher: Arc<dyn RestartDispatcher>,
     ) -> Result<Self> {
+        validate_agent_tools(&config)?;
         normalize_agent_homes(&mut config, &env)?;
+        if config["agentMessaging"]["tools"]["enabled"] == true {
+            #[cfg(not(feature = "agent-network"))]
+            bail!("agentMessaging.tools requires the agent-network build feature");
+        }
         let owner_registry = AdmissionConfig::from_value(&config)?.map(|admission| {
             OwnerRegistry::new(
                 admission,
@@ -1028,8 +1039,21 @@ impl Bridge {
             permissions: Default::default(),
             questions: Default::default(),
             owner_registry,
+            #[cfg(feature = "agent-network")]
+            agent_tools: std::sync::OnceLock::new(),
         })
     }
+    pub async fn prepare_agent_tools(self: &Arc<Self>) -> Result<()> {
+        if self.config["agentMessaging"]["tools"]["enabled"] != true {
+            return Ok(());
+        }
+        #[cfg(feature = "agent-network")]
+        {
+            let _ = self.agent_tools.set(Arc::downgrade(self));
+        }
+        Ok(())
+    }
+
     pub fn context(&self, event: &Event) -> String {
         if boolean(&self.config[&event.platform], "threadIsolation") && !event.thread.is_empty() {
             format!("{}:{}", event.room, event.thread)
@@ -1079,28 +1103,20 @@ impl Bridge {
         backend: &str,
         client: &Client,
         sink: &dyn Sink,
-    ) {
-        let Some(registry) = &self.owner_registry else {
-            return;
-        };
-        let Ok(Some(entry)) = self.store.get(&event.platform, context, backend) else {
-            return;
-        };
-        let Ok(identity) = self.backend_identity(backend) else {
-            return;
-        };
+    ) -> Option<LocalClient> {
+        let registry = self.owner_registry.as_ref()?;
+        let entry = self.store.get(&event.platform, context, backend).ok()??;
+        let identity = self.backend_identity(backend).ok()?;
         if entry.backend_id != identity {
-            return;
+            return None;
         }
         let session_id = client.session_id().await;
         if session_id.as_deref() != Some(entry.session_id.as_str())
             || client.working_directory().to_string_lossy() != entry.cwd
         {
-            return;
+            return None;
         }
-        let Ok(conversation) = ConversationKey::new(&event.platform, context) else {
-            return;
-        };
+        let conversation = ConversationKey::new(&event.platform, context).ok()?;
         let origin = AdmittedOrigin {
             platform: event.platform.clone(),
             conversation,
@@ -1110,7 +1126,7 @@ impl Bridge {
             reply_to: event.reply_to.clone(),
             matrix_raw_thread: sink.matrix_raw_thread(),
         };
-        if let Some(local) = registry.issue_human(
+        let local = registry.issue_human(
             &event.platform,
             context,
             backend,
@@ -1119,9 +1135,21 @@ impl Bridge {
             entry.session_id,
             self.store.0.clone(),
             origin,
-        ) {
-            sink.local_client(local);
-        }
+        )?;
+        sink.local_client(local.clone());
+        Some(local)
+    }
+
+    #[cfg(feature = "agent-network")]
+    async fn activate_human_tool_scope(
+        &self,
+        conversation: &ConversationSlot,
+        local: Option<LocalClient>,
+        budget: &crate::delivery::agent_tools::HumanRootAskBudget,
+    ) -> Option<crate::delivery::agent_tools::HumanToolScope> {
+        let local = local?;
+        let session = conversation.lock().await.agent_tools.clone()?;
+        Some(session.activate_with_budget(local, budget))
     }
 
     fn revoke_local_client(&self, platform: &str, context: &str) {
@@ -1182,6 +1210,13 @@ impl Bridge {
             reservation.release_without_execution();
             return Err(DirectRefusal::Unavailable);
         };
+        // A peer execution must not inherit a human-root tool scope on its recipient.
+        // Keep the sender scope active so the MCP call can complete its epoch check.
+        if let Ok(state) = conversation.try_lock()
+            && let Some(tools) = &state.agent_tools
+        {
+            tools.deactivate();
+        }
         let bridge = self.clone();
         let text = request.text().to_owned();
         let (sender, receiver) = oneshot::channel();
@@ -1765,6 +1800,31 @@ impl Bridge {
             std::fs::create_dir_all(&directory)?;
             std::fs::canonicalize(directory)?
         };
+        #[cfg(feature = "agent-network")]
+        let tool_session = if self.agent_tool_owner(platform, context, backend) {
+            let bridge = self.agent_tools.get().context(
+                "agentMessaging.tools is enabled but Bridge::prepare_agent_tools was not called",
+            )?;
+            Some(crate::delivery::agent_tools::AgentToolSession::start(bridge.clone()).await?)
+        } else {
+            None
+        };
+        #[cfg(feature = "agent-network")]
+        let (client, identity) = if let Some(session) = &tool_session {
+            let config = self.backend_config(backend)?;
+            let servers = config["mcpServers"].as_array().cloned().unwrap_or_default();
+            if servers
+                .iter()
+                .any(|server| server["name"] == "soulsteads_agents")
+            {
+                bail!("Codex backend already declares reserved MCP server soulsteads_agents");
+            }
+            self.launch_with_extra(backend, &directory, Some(session.registration()))
+                .await?
+        } else {
+            self.launch(backend, &directory).await?
+        };
+        #[cfg(not(feature = "agent-network"))]
         let (client, identity) = self.launch(backend, &directory).await?;
         let publication = async {
             if let Some(applied) = &applied {
@@ -1801,8 +1861,16 @@ impl Bridge {
             let _ = client.shutdown().await;
             return Err(error);
         }
+        #[cfg(feature = "agent-network")]
+        if let Some(old_tools) = state.agent_tools.take() {
+            old_tools.close();
+        }
         if let Some(old) = state.client.replace(client.clone()) {
             let _ = old.shutdown().await;
+        }
+        #[cfg(feature = "agent-network")]
+        {
+            state.agent_tools = tool_session;
         }
         if state.backend != backend {
             state.projects.clear();
@@ -1932,6 +2000,30 @@ impl Bridge {
         Ok(())
     }
     async fn launch(&self, backend: &str, directory: &Path) -> Result<(Client, String)> {
+        self.launch_with_extra(backend, directory, None).await
+    }
+
+    #[cfg(feature = "agent-network")]
+    fn agent_tool_owner(&self, platform: &str, context: &str, backend: &str) -> bool {
+        self.config["agentMessaging"]["tools"]["enabled"] == true
+            && backend == "codex"
+            && self.config["agentMessaging"]["agents"]
+                .as_array()
+                .is_some_and(|agents| {
+                    agents.iter().any(|agent| {
+                        agent["target"]["platform"] == platform
+                            && agent["target"]["context"] == context
+                            && agent["target"]["backend"] == backend
+                    })
+                })
+    }
+
+    async fn launch_with_extra(
+        &self,
+        backend: &str,
+        directory: &Path,
+        extra_server: Option<Value>,
+    ) -> Result<(Client, String)> {
         if let Some(home) = self.agent_home(backend)? {
             let actual = std::fs::canonicalize(directory).with_context(|| {
                 format!(
@@ -1971,7 +2063,20 @@ impl Bridge {
                 .flatten()
                 .filter_map(|(key, value)| value.as_str().map(|value| (key.clone(), value.into()))),
         );
-        let servers = config["mcpServers"].as_array().cloned().unwrap_or_default();
+        const LOCAL_TOOLS_GRANT: &str = "SOULSTEADS_LOCAL_AGENT_TOOLS_GRANT";
+        env.remove(LOCAL_TOOLS_GRANT);
+        #[cfg(feature = "agent-network")]
+        if backend == "codex"
+            && let Some(server) = extra_server.as_ref()
+            && let Some(fingerprint) =
+                crate::delivery::agent_tools::runtime_grant_fingerprint(server)
+        {
+            env.insert(LOCAL_TOOLS_GRANT.into(), fingerprint);
+        }
+        let mut servers = config["mcpServers"].as_array().cloned().unwrap_or_default();
+        if let Some(server) = extra_server {
+            servers.push(server);
+        }
         let client = Client::connect(
             Transport::select(backend, config)?,
             Options {
@@ -2208,7 +2313,34 @@ impl Bridge {
             bail!("Stored backend identity differs");
         }
         self.revoke_local_client(&event.platform, context);
-        let (client, identity) = self.launch(backend, Path::new(cwd)).await?;
+        #[cfg(feature = "agent-network")]
+        let tool_session = if self.agent_tool_owner(&event.platform, context, backend) {
+            let bridge = self.agent_tools.get().context(
+                "agentMessaging.tools is enabled but Bridge::prepare_agent_tools was not called",
+            )?;
+            Some(crate::delivery::agent_tools::AgentToolSession::start(bridge.clone()).await?)
+        } else {
+            None
+        };
+        #[cfg(feature = "agent-network")]
+        let launch = if let Some(session) = &tool_session {
+            self.launch_with_extra(backend, Path::new(cwd), Some(session.registration()))
+                .await
+        } else {
+            self.launch(backend, Path::new(cwd)).await
+        };
+        #[cfg(not(feature = "agent-network"))]
+        let launch = self.launch(backend, Path::new(cwd)).await;
+        let (client, identity) = match launch {
+            Ok(launch) => launch,
+            Err(error) => {
+                #[cfg(feature = "agent-network")]
+                if let Some(session) = &tool_session {
+                    session.close();
+                }
+                return Err(error);
+            }
+        };
         let publication = async {
             let mut unavailable = false;
             let history = match client.load_session(session_id, false).await {
@@ -2238,12 +2370,24 @@ impl Bridge {
             Ok(published) => published,
             Err(error) => {
                 let _ = client.shutdown().await;
+                #[cfg(feature = "agent-network")]
+                if let Some(session) = &tool_session {
+                    session.close();
+                }
                 return Err(error);
             }
         };
+        #[cfg(feature = "agent-network")]
+        if let Some(previous) = state.agent_tools.take() {
+            previous.close();
+        }
         if let Some(previous) = state.client.replace(client) {
             let _ = previous.close_session().await;
             let _ = previous.shutdown().await;
+        }
+        #[cfg(feature = "agent-network")]
+        {
+            state.agent_tools = tool_session;
         }
         state.backend = backend.into();
         state.selected_cwd = Some(cwd.into());
@@ -2627,7 +2771,16 @@ impl Bridge {
             sink.emit(json!({"type":"thinking"})).await?;
         }
         drop(state);
-        self.issue_local_client(event, context, &backend, &client, sink)
+        let local_client = self
+            .issue_local_client(event, context, &backend, &client, sink)
+            .await;
+        #[cfg(not(feature = "agent-network"))]
+        let _ = local_client;
+        #[cfg(feature = "agent-network")]
+        let human_root_ask_budget = crate::delivery::agent_tools::HumanRootAskBudget::new();
+        #[cfg(feature = "agent-network")]
+        let mut tool_scope = self
+            .activate_human_tool_scope(conversation, local_client, &human_root_ask_budget)
             .await;
         let mut retried = false;
         let mut completion_guard = None;
@@ -2706,8 +2859,18 @@ impl Bridge {
                         .await?;
                     state.input_chars += event.text.encode_utf16().count();
                     drop(state);
-                    self.issue_local_client(event, context, &backend, &client, sink)
+                    let local = self
+                        .issue_local_client(event, context, &backend, &client, sink)
                         .await;
+                    #[cfg(feature = "agent-network")]
+                    {
+                        drop(tool_scope.take());
+                        tool_scope = self
+                            .activate_human_tool_scope(conversation, local, &human_root_ask_budget)
+                            .await;
+                    }
+                    #[cfg(not(feature = "agent-network"))]
+                    let _ = local;
                     retried = true;
                     continue;
                 }
@@ -2800,8 +2963,18 @@ impl Bridge {
                 .await?;
             state.input_chars += event.text.encode_utf16().count();
             drop(state);
-            self.issue_local_client(event, context, &backend, &client, sink)
+            let local = self
+                .issue_local_client(event, context, &backend, &client, sink)
                 .await;
+            #[cfg(feature = "agent-network")]
+            {
+                drop(tool_scope.take());
+                tool_scope = self
+                    .activate_human_tool_scope(conversation, local, &human_root_ask_budget)
+                    .await;
+            }
+            #[cfg(not(feature = "agent-network"))]
+            let _ = local;
             retried = true;
         };
         let _completion_guard = completion_guard;
@@ -3231,6 +3404,10 @@ impl Bridge {
                     continue;
                 }
                 *cleanup = state.client.take();
+                #[cfg(feature = "agent-network")]
+                if let Some(tools) = state.agent_tools.take() {
+                    tools.close();
+                }
                 state.mirror = None;
                 state.message_count = 0;
                 state.input_chars = 0;
@@ -3254,6 +3431,10 @@ impl Bridge {
             .collect::<Vec<_>>();
         for session in sessions {
             let mut state = session.lock().await;
+            #[cfg(feature = "agent-network")]
+            if let Some(tools) = state.agent_tools.take() {
+                tools.close();
+            }
             let mut cleanup = session.expiry_cleanup.lock().await;
             cleanup_expired_client(&mut cleanup).await;
             state.mirror = None;

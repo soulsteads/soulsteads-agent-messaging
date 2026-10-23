@@ -16,11 +16,15 @@ be attached to their existing owner. Busy, cold, revoked or unauthorized targets
 are refused, not queued. Results carry a correlation ID and are not automatically
 posted into a human conversation.
 
-This is an in-process API, not a remote networking endpoint. It adds no IPC
-listener, discovery, harness tools, durable queue, replay or delayed replies.
-Durable delivery through `LocalClient::send` and `reply` is unavailable; use
-`Bridge::direct_request` for direct requests. Caller disconnection does not prove
-execution stopped; requests with an uncertain outcome must not be blindly retried.
+The direct-request core is an in-process API, not a remote networking endpoint.
+The optional [local Codex tools](AGENT-TOOLS.md) integration adds a session-scoped,
+authenticated loopback MCP endpoint for `list_agents` and `ask_agent`. It requires
+an additional explicit runtime opt-in; ordinary direct API use starts no listener.
+The roster exposes only permitted identities and current attached/unavailable
+bindings, not task details or a promise of idle capacity. There is no durable
+queue, replay or delayed reply. Durable delivery through `LocalClient::send` and
+`reply` remains unavailable. Caller disconnection does not prove execution
+stopped; requests with an uncertain outcome must not be blindly retried.
 
 ## Repeatable, credential-free checks
 

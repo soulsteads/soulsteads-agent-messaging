@@ -51,6 +51,29 @@ pub(super) fn mcp_config(servers: &Value, cwd: &Path) -> Result<Value> {
             Some("http") => json!({"url":server["url"],"http_headers":pairs(&server["headers"])?}),
             _ => bail!("Codex supports stdio and HTTP MCP servers, not SSE"),
         };
+        #[cfg(feature = "agent-network")]
+        let value = {
+            let mut value = value;
+            if name == "soulsteads_agents"
+                && crate::delivery::agent_tools::runtime_grant_fingerprint(server).is_some_and(
+                    |fingerprint| {
+                        std::env::var("SOULSTEADS_LOCAL_AGENT_TOOLS_GRANT")
+                            .ok()
+                            .as_deref()
+                            == Some(&fingerprint)
+                    },
+                )
+            {
+                value["enabled_tools"] = json!(["list_agents", "ask_agent"]);
+                value["tools"] = json!({
+                    "list_agents":{"approval_mode":"approve"},
+                    "ask_agent":{"approval_mode":"approve"}
+                });
+                value["default_tools_approval_mode"] = json!("prompt");
+                value["tool_timeout_sec"] = json!(310);
+            }
+            value
+        };
         mcp.insert(name.into(), value);
     }
     if !mcp.is_empty() {

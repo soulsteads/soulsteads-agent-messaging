@@ -1,10 +1,12 @@
 mod admission;
+#[cfg(feature = "agent-network")]
+pub mod agent_tools;
 mod local;
 mod types;
 
 pub use local::{
-    LocalClient, LocalRefusal, RecordStatus, ReplyHandle, ReplyOutcome, SendOutcome, SourceClass,
-    VisibleRecord,
+    LocalClient, LocalRefusal, RecipientState, RecordStatus, ReplyHandle, ReplyOutcome,
+    SendOutcome, SourceClass, VisibleRecord,
 };
 pub use types::{
     AgentId, ConversationKey, DeliveryContractError, DeliveryMode, MAX_AGENT_ID_BYTES,
