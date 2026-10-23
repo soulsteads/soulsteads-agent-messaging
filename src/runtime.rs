@@ -1817,7 +1817,7 @@ impl Bridge {
                 .iter()
                 .any(|server| server["name"] == "soulsteads_agents")
             {
-                bail!("Codex backend already declares reserved MCP server soulsteads_agents");
+                bail!("Backend already declares reserved MCP server soulsteads_agents");
             }
             self.launch_with_extra(backend, &directory, Some(session.registration()))
                 .await?
@@ -2006,7 +2006,7 @@ impl Bridge {
     #[cfg(feature = "agent-network")]
     fn agent_tool_owner(&self, platform: &str, context: &str, backend: &str) -> bool {
         self.config["agentMessaging"]["tools"]["enabled"] == true
-            && backend == "codex"
+            && self.config["agentMessaging"]["tools"]["harness"] == backend
             && self.config["agentMessaging"]["agents"]
                 .as_array()
                 .is_some_and(|agents| {

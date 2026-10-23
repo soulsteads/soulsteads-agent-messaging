@@ -1,6 +1,6 @@
 # Local agent tools
 
-An optional Codex integration lets one Messaging-managed conversation ask another
+An optional Codex or OpenCode integration lets one Messaging-managed conversation ask another
 configured agent a question. It reuses the existing conversation owner and
 `Bridge::direct_request`; it does not launch a second agent runtime.
 
@@ -22,7 +22,9 @@ configured agent a question. It reuses the existing conversation owner and
 The MCP listener is private loopback plumbing between the owned Codex process
 and Messaging. It is not a public agent-network API or an additional service.
 The integration is disabled unless both the Cargo feature and runtime option are
-enabled. Other harnesses keep their existing behavior.
+enabled. Other harnesses keep their existing behavior. All participants must be
+owned by the **same Bridge process**. Separate connector services cannot discover
+or ask each other through this in-process capability.
 
 ## Build and configure
 
@@ -98,6 +100,47 @@ an Internet authentication mechanism or expose this demonstration publicly.
 Other platform contexts must match Messaging's exact established conversation
 keys. Configuration is trusted operator input, not agent-selected routing.
 
+## OpenCode configuration and permissions
+
+For an OpenCode-only deployment, set `agentMessaging.tools.harness` to `"opencode"`,
+set each participating target's `backend` to `"opencode"`, and configure the
+OpenCode backend instead of the Codex backend:
+
+```json
+{
+  "acp": {
+    "defaultBackend": "opencode",
+    "backends": {
+      "opencode": {
+        "command": "/absolute/path/to/opencode",
+        "args": ["acp"],
+        "transport": "acp"
+      }
+    }
+  }
+}
+```
+
+Keep the other owner, recipient-permission and opt-in fields from the earlier
+example. The harness setting selects one supported backend for tool registration;
+changing a model/provider name does not change the harness. Conversations without
+an exact configured owner do not receive a local tool endpoint.
+
+The bridge passes the ephemeral MCP declaration through OpenCode's existing ACP
+session interface. It does **not** add a Codex-style approval grant, change global
+OpenCode configuration, override existing native tool policies, or switch the
+selected transport. Native OpenCode permissions must already permit the two
+registered MCP tools, `soulsteads_agents_list_agents` and
+`soulsteads_agents_ask_agent`. A native denial remains a denial; enabling messaging
+is not permission to override it. Configure any desired native permission change
+explicitly at the owning profile, not through a wildcard approval bypass.
+
+OpenCode native REST/SSE transport is rejected when OpenCode agent tools are
+enabled. Its experimental dynamic MCP API has not been qualified for
+same-directory session isolation. Ordinary native backends with these tools
+disabled remain unchanged. Keep the existing ACP selection for the first
+OpenCode deployment.
+
 ## First exchange
 
 1. Open Reviewer's conversation and send a short informational prompt so the
@@ -112,7 +155,7 @@ informational work. The current Web frontend does not expose that command; it
 retains the adapter's normal workspace-write policy. Do not mistake an
 informational prompt for an enforced read-only sandbox.
 
-Tool registration is scoped to the configured Codex owner, and tool-call
+Tool registration is scoped to the configured harness and exact owner, and tool-call
 authority is active only during its admitted human-root prompt. Initialization
 and tool discovery may happen earlier, but cannot authorize an agent request.
 A previous human turn must not grant nested-send authority to a later peer turn.
@@ -128,7 +171,7 @@ cannot choose a sender, native session, working directory, executable or return
 route. Slash-prefixed peer text remains text; it does not invoke human controls.
 Peer turns do not inherit human interactive approval or question handlers.
 
-Enabling this feature authorizes native Codex calls to **only** `list_agents`
+For Codex, enabling this feature authorizes native calls to **only** `list_agents`
 and `ask_agent` on the exact runtime-issued local server, without a separate
 human approval for each call. The host binds that two-tool grant to the session's
 registration fingerprint; a matching name alone grants nothing. Other MCP tools,

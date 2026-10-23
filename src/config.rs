@@ -158,10 +158,24 @@ pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
         if config["agentMessaging"]["enabled"] != true {
             bail!("agentMessaging.tools requires agentMessaging.enabled=true");
         }
-        if tools.get("harness").and_then(Value::as_str) != Some("codex") {
+        if tools.get("harness").and_then(Value::as_str) != Some("codex")
+            && tools.get("harness").and_then(Value::as_str) != Some("opencode")
+        {
             bail!(
-                "agentMessaging.tools.harness must be explicitly set to \"codex\" when tools are enabled"
+                "agentMessaging.tools.harness must be explicitly set to \"codex\" or \"opencode\" when tools are enabled"
             );
+        }
+        if tools.get("harness").and_then(Value::as_str) == Some("opencode") {
+            let backend = if config["acp"]["backends"]["opencode"].is_object() {
+                &config["acp"]["backends"]["opencode"]
+            } else {
+                &config["acp"]
+            };
+            if crate::backend::Transport::select("opencode", backend)?
+                != crate::backend::Transport::Acp
+            {
+                bail!("OpenCode agent tools require the ACP transport");
+            }
         }
     }
     if tools

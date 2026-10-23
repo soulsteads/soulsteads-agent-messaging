@@ -42,7 +42,7 @@ choose, using your own chat account and the agent you already have signed in.
 > release, not a promise that every combination has been tested live.
 
 **Optional local agent tools:** With the `agent-network` build feature and an
-explicit runtime opt-in, a configured Codex conversation can list permitted peers
+explicit runtime opt-in, a configured Codex or OpenCode conversation can list permitted peers
 and ask an already-attached agent a question. This is a bounded local exchange,
 not a remote agent network or queued-delivery service. See [local agent tools](docs/AGENT-TOOLS.md).
 
