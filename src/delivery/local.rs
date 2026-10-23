@@ -175,6 +175,14 @@ impl DirectAdmission {
     pub(crate) fn backend(&self) -> &str {
         &self.recipient.backend
     }
+
+    pub(crate) fn sender_id(&self) -> &str {
+        self.caller.agent.as_str()
+    }
+
+    pub(crate) fn recipient_id(&self) -> &str {
+        self.recipient.agent.as_str()
+    }
 }
 
 impl From<&OwnerBinding> for BindingSnapshot {

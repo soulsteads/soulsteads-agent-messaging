@@ -23,3 +23,19 @@ Run focused `--locked --no-default-features --features agent-network` tests duri
 ## Build ownership
 
 Task-owned regenerable outputs: `/var/tmp/soulsteads-local-agent-tools-target` and `/var/tmp/soulsteads-local-agent-tools-tmp`. Free space checked on `/var/tmp` before starting (94 GiB available). Serialize builds/tests sharing these directories. Preserve source and unique evidence. After delivery and reviews, check active process/executable/cwd/open-file/mapped references, then remove these exact inactive task outputs and measure space reclaimed. Never delete shared caches or the existing Forge-host artifacts.
+
+## Focused follow-up: peer request context
+
+For model-facing direct requests, add a bounded JSON peer envelope at the existing
+execution boundary. Sender and recipient IDs must come only from trusted
+`DirectAdmission`; preserve the existing source class, authorization and interaction
+isolation. Identify the recipient as answering for the caller and explicitly mark
+request text as peer data, not operator/system authority. Keep content structurally
+escaped, accept the existing maximum request payload within backend prompt budget,
+and preserve human prompt bytes, reply routing, session ownership, busy/stale and
+uncertain behavior. Do not add roles, services, permissions or configuration.
+
+Regress actual backend prompt capture with spoofed identity/delimiter text, slash and
+Unicode, maximum-size control-heavy text, and unchanged human prompts. Document the
+public behavior and limits. Fixture qualification is not live model or production
+acceptance. No private incident evidence belongs in the public tree.
