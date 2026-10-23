@@ -17,7 +17,7 @@ are refused, not queued. Results carry a correlation ID and are not automaticall
 posted into a human conversation.
 
 The direct-request core is an in-process API, not a remote networking endpoint.
-The optional [local Codex tools](AGENT-TOOLS.md) integration adds a session-scoped,
+The optional [local agent tools](AGENT-TOOLS.md) integration adds a session-scoped,
 authenticated loopback MCP endpoint for `list_agents` and `ask_agent`. It requires
 an additional explicit runtime opt-in; ordinary direct API use starts no listener.
 The roster exposes only permitted identities and current attached/unavailable

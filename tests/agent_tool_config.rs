@@ -24,8 +24,8 @@ fn rejects_tools_without_agent_messaging_enabled() {
 }
 
 #[test]
-fn enabled_tools_require_explicit_codex_harness() {
-    for harness in [None, Some("opencode"), Some("")] {
+fn enabled_tools_require_explicit_supported_harness() {
+    for harness in [None, Some("other"), Some("")] {
         let mut tools = json!({"enabled":true});
         if let Some(harness) = harness {
             tools["harness"] = harness.into();
@@ -61,6 +61,38 @@ fn raw_bridge_constructor_rejects_invalid_tools_harness() {
             .expect("invalid harness should be rejected")
             .to_string();
     assert!(error.contains("agentMessaging.tools.harness"));
+}
+
+#[test]
+fn open_code_tools_require_acp_without_restricting_disabled_native_backends() {
+    for acp in [
+        json!({"command":"opencode","transport":"native"}),
+        json!({"backends":{"opencode":{"command":"opencode","transport":"native"}}}),
+    ] {
+        let mut value = json!({"acp":acp,"agentMessaging":{"enabled":true,"tools":{"enabled":true,"harness":"opencode"}}});
+        let error =
+            load(value.clone()).expect_err("unqualified native MCP isolation must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("OpenCode agent tools require the ACP transport"),
+            "{error}"
+        );
+        value["agentMessaging"]["tools"]["enabled"] = false.into();
+        assert!(
+            load(value).is_ok(),
+            "ordinary native backends are unaffected"
+        );
+    }
+}
+
+#[test]
+fn accepts_explicit_opencode_tools_opt_in() {
+    let enabled = load(json!({
+        "agentMessaging":{"enabled":true,"tools":{"enabled":true,"harness":"opencode"}}
+    }))
+    .unwrap();
+    assert_eq!(enabled["agentMessaging"]["tools"]["harness"], "opencode");
 }
 
 #[cfg(not(feature = "agent-network"))]
