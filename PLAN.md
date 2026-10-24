@@ -41,7 +41,7 @@ not change merely because A2A is enabled.
 
 ## Checkpoint 0: SDK qualification
 
-**Status: SDK-only qualification implemented; production A2A integration remains planned.**
+**Status: complete (SDK qualification); production A2A integration remains planned.**
 
 Scope:
 - Optional `a2a` Cargo feature, independent of `agent-network` and off by default.
@@ -55,12 +55,35 @@ Scope:
 See `docs/A2A.md` for qualification commands and evidence once verified. The
 feature name is not a claim that Messaging already exposes an A2A endpoint.
 
+## Checkpoint 1a: inert configuration and private policy
+
+**Status: implemented; release qualification tracked in the exact-candidate delivery receipt.**
+
+Source implementation: strict inert configuration and private exact allowlist policy. Final review and broader feature-matrix validation are not claimed here.
+
+The staged configuration and private exact allowlist are not a production
+admission mechanism. This packet accepts only strict inert configuration and
+has no listener, authentication, execution, or task-storage path. Enabled A2A is
+available for `--check-config` in builds with `a2a`; ordinary startup refuses it
+until a separately reviewed endpoint exists. The policy does not authenticate
+callers or confer execution authority. See `docs/A2A.md` for the exact example,
+limits, vertical RED/GREEN evidence, and commands.
+
+- [x] 0: official SDK-only qualification.
+- [x] 1a: strict inert configuration and private exact allowlist policy.
+- [ ] Final review and broader feature-matrix validation of the 1a candidate.
+- [ ] Subsequent authentication, session, persistence, server, and outbound
+  packets remain planned and require separate design/review.
+
 ## Next packets, in dependency order
 
-Until SDK qualification and its pending reviews are complete, do not freeze a
-public listener design or durable storage schema. The next packet is limited to
-read-only, inert configuration validation and admission-policy tests: it must
-not start listeners, create sessions, or mutate task storage.
+Checkpoint 1a does not freeze a full A2A schema or authorize runtime support.
+Continue the remaining plan only after candidate review and validation. Do not
+freeze a public listener design or durable storage schema until those gates pass.
+The full configuration and external-authority contract remains planned. Checkpoint
+1a covers only the strict inert subset described above; future packets still
+need to define named outbound peers, per-agent grants, limits, and admission
+behavior before any runtime integration.
 
 ### 1. Configuration and external authority
 

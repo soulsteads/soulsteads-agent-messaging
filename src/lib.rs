@@ -1,3 +1,4 @@
+mod a2a;
 pub mod acp;
 pub mod adapters;
 pub mod backend;
