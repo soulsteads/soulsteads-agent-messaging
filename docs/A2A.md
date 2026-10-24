@@ -1,6 +1,60 @@
 # A2A SDK qualification (milestone 0)
 
-**This is SDK-only qualification, not production A2A runtime support.** No production client/server, lifecycle, identity, authorization policy, persistence, TLS configuration, or service integration is implemented. `a2a` is opt-in and independent of `agent-network`; it is not enabled by default.
+## Checkpoint 1a — inert configuration and private policy
+
+The following is accepted only by builds compiled with `--features a2a`. It is a
+strict, inert configuration contract: `--check-config` validates it without
+opening the verifier reference. The referenced path is syntactic only; no file
+is read, checked, created, or authenticated. Ordinary prompt and `--serve`
+startup refuse enabled A2A because there is no endpoint implementation.
+
+```json
+{
+  "a2a": {
+    "version": 1,
+    "enabled": true,
+    "peers": [{"id": "review-peer", "verifierPath": "/private/a2a/review.verifier"}],
+    "agents": [{"id": "reviewer", "backend": "opencode", "allowedPeers": ["review-peer"]}]
+  }
+}
+```
+
+Minimal `{"a2a":{"enabled":false}}` is valid, and omitting `a2a` keeps legacy
+defaults. Unknown fields are rejected even while disabled. IDs are exact,
+bounded opaque strings of at most 128 UTF-8 bytes; leading or trailing
+whitespace and control characters are rejected, with no normalization.
+Environment-substitution syntax is rejected. Enabled configuration requires
+version 1, nonempty peer and agent lists, configured backend targets, absolute
+verifier paths, and unique valid IDs/grants. An empty `allowedPeers` list
+denies all peers. The private allowlist is a policy lookup only—not
+authentication, an execution capability, or a server authorization hook. No
+transport, storage, listener, token, or execution settings are implemented by
+this checkpoint.
+
+### Checkpoint 1a verification
+
+Run from the repository root:
+
+```sh
+cargo test --locked --no-default-features --features a2a --test a2a_config
+cargo test --locked --no-default-features --test a2a_config
+cargo test --locked --no-default-features --features a2a --lib a2a::policy_tests
+```
+
+The retained final feature-on/off and policy logs record **15 passed** for the
+feature-on configuration tests, **11 passed** for the feature-off configuration
+tests, and **4 passed** for the private policy tests. These are focused checks;
+broader feature-matrix validation and final independent review are not claimed
+here. The exact-candidate delivery receipt tracks release qualification.
+
+### Plan checkpoint
+
+- [x] 1a: strict inert config and private exact peer/agent allowlist.
+- [ ] Follow-on checkpoints: separately review authentication and runtime
+  design before implementing any endpoint, task execution, storage, or network
+  behavior. This document does not freeze a durable schema.
+
+**This is SDK-only qualification, not production A2A runtime support.** No production client/server, lifecycle, identity, authentication, transport authorization hook, persistence, TLS configuration, or service integration is implemented. Checkpoint 1a's private exact allowlist is policy data only; it authenticates no caller and grants no execution authority. `a2a` is opt-in and independent of `agent-network`; it is not enabled by default.
 
 ## SDKs pinned
 
