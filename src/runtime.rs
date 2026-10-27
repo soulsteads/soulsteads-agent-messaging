@@ -1005,6 +1005,7 @@ impl Bridge {
         workspace: PathBuf,
         restart_dispatcher: Arc<dyn RestartDispatcher>,
     ) -> Result<Self> {
+        crate::a2a::validate(&config)?;
         validate_agent_tools(&config)?;
         normalize_agent_homes(&mut config, &env)?;
         if config["agentMessaging"]["tools"]["enabled"] == true {

@@ -49,7 +49,10 @@ impl Loader {
                             .cloned()
                     })
                     .is_some();
-                if opts_into_agent_tools {
+                let opts_into_a2a = serde_json::from_str::<Value>(&input)
+                    .ok()
+                    .is_some_and(|value| value.get("a2a").is_some());
+                if opts_into_agent_tools || opts_into_a2a {
                     load(&input, env)?
                 } else {
                     load(&input, env).unwrap_or_else(|_| defaults())
@@ -205,9 +208,13 @@ pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
         }
         supplied.as_object_mut().unwrap().remove("streamTools");
     }
+    let mut prevalidated = defaults();
+    merge(&mut prevalidated, supplied.clone());
+    crate::a2a::validate(&prevalidated)?;
     substitute(&mut supplied, env);
     let mut value = defaults();
     merge(&mut value, supplied);
+    crate::a2a::validate(&value)?;
     validate_agent_tools(&value)?;
     if value["matrix"].is_object() {
         if !value["matrix"]["showFullPaths"].is_boolean() {
@@ -234,6 +241,9 @@ pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
     if (!value["toolMessages"].is_object() && !value["toolMessages"].is_array())
         || (!value["web"].is_object() && !value["web"].is_array())
     {
+        if value.get("a2a").is_some() {
+            bail!("Malformed legacy configuration cannot be combined with a2a");
+        }
         return Ok(defaults());
     }
     if value["toolMessages"].is_object() {
