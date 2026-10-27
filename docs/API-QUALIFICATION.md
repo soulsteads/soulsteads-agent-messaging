@@ -16,6 +16,16 @@ be attached to their existing owner. Busy, cold, revoked or unauthorized targets
 are refused, not queued. Results carry a correlation ID and are not automatically
 posted into a human conversation.
 
+For model-facing direct requests, the recipient receives a JSON-serialized
+`peer_request` envelope with sender and recipient IDs from the admitted owner
+bindings and the exact request text as a JSON string value. It labels the recipient
+as answering the peer and returning the reply to the caller, and labels the content
+as peer data separate from operator/system instructions. This prompt context does
+not provide a sandbox or an agent role; callers still need to supply self-contained
+scope and evidence, including project/revision details when relevant. The existing
+64 KiB request-text limit is unchanged; JSON escaping can expand the content, but
+maximum-size envelopes stay below the ACP prompt budget. Human prompts are unchanged.
+
 The direct-request core is an in-process API, not a remote networking endpoint.
 The optional [local agent tools](AGENT-TOOLS.md) integration adds a session-scoped,
 authenticated loopback MCP endpoint for `list_agents` and `ask_agent`. It requires

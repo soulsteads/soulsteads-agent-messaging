@@ -184,3 +184,19 @@ receipts outside disposable build output. Run feature-off, `a2a`, and combined
 Remove only inactive regenerable task-owned outputs after final verification and
 fresh process/open-file/reference checks. Preserve source, credentials, unique
 evidence, deployed binaries, and rollback artifacts.
+
+## Focused follow-up: peer request context
+
+For model-facing direct requests, add a bounded JSON peer envelope at the existing
+execution boundary. Sender and recipient IDs must come only from trusted
+`DirectAdmission`; preserve the existing source class, authorization and interaction
+isolation. Identify the recipient as answering for the caller and explicitly mark
+request text as peer data, not operator/system authority. Keep content structurally
+escaped, accept the existing maximum request payload within backend prompt budget,
+and preserve human prompt bytes, reply routing, session ownership, busy/stale and
+uncertain behavior. Do not add roles, services, permissions or configuration.
+
+Regress actual backend prompt capture with spoofed identity/delimiter text, slash and
+Unicode, maximum-size control-heavy text, and unchanged human prompts. Document the
+public behavior and limits. Fixture qualification is not live model or production
+acceptance. No private incident evidence belongs in the public tree.
