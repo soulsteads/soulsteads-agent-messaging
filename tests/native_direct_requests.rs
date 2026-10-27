@@ -149,9 +149,22 @@ async fn owner_bound_direct_requests_use_each_compiled_native_adapter_without_hu
             .filter_map(|entry| admitted_text(backend, entry))
             .collect();
         assert_eq!(
-            texts,
-            ["warm beta", "warm alpha", "/clear literal"],
-            "{backend}: exactly one native submission for the direct literal, no command interpretation"
+            texts.len(),
+            3,
+            "{backend}: exactly one native submission for the direct request"
+        );
+        assert_eq!(&texts[..2], ["warm beta", "warm alpha"]);
+        let peer: Value = serde_json::from_str(texts[2]).unwrap();
+        assert_eq!(peer["role"], "peer_request", "{backend}");
+        assert_eq!(peer["sender"], "alpha", "{backend}");
+        assert_eq!(peer["recipient"], "beta", "{backend}");
+        assert_eq!(peer["content"], "/clear literal", "{backend}");
+        assert!(
+            peer["recipient_instruction"]
+                .as_str()
+                .unwrap()
+                .contains("return your reply to the caller"),
+            "{backend}: native models must receive the reply destination context"
         );
         assert!(
             !root
