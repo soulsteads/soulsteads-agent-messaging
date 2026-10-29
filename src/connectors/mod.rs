@@ -4,6 +4,7 @@ pub mod matrix;
 #[cfg(feature = "platform-sdks")]
 #[path = "matrix/attachment.rs"]
 mod matrix_attachment;
+pub(crate) mod telegram;
 
 // Matrix helpers remain available without the optional platform SDKs because
 // runtime and ACP use their scoped broker and restart contracts directly.
