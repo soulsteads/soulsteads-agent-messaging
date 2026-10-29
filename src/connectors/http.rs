@@ -16,6 +16,9 @@ pub struct Platform {
 }
 impl Platform {
     async fn admit(&self, bridge: &Bridge, message: &Value) -> Result<Option<Event>> {
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::inbound::admit(self, bridge, message).await;
+        }
         let Some(mut event) = self.map(message) else {
             return Ok(None);
         };
@@ -71,181 +74,13 @@ impl Platform {
         if !bridge.transport_admissible(&event).await {
             return Ok(None);
         }
-        if self.kind != "telegram" {
-            return Ok(Some(event));
-        }
-        let body = if message["message"].is_object() {
-            &message["message"]
-        } else {
-            message
-        };
-        let config = &bridge.config["telegram"];
-        let context = bridge.context(&event);
-        let active = bridge.has_persisted("telegram", &context)?;
-        let trigger = bridge
-            .env
-            .get("TELEGRAM_TRIGGER")
-            .map(String::as_str)
-            .unwrap_or_else(|| crate::config::string(&bridge.config, "trigger"));
-        let replying = config["respondToReplies"] == true
-            && body["reply_to_message"]["from"]["is_bot"] == true
-            && scalar(&body["reply_to_message"]["from"]["id"]) == self.bot;
-        let implicit = active
-            && (replying
-                || (config["respondToImplicitTopicReplies"] == true
-                    && config["threadIsolation"] == true
-                    && !event.thread.is_empty()));
-        let addressed = crate::runtime::telegram_approval_control(&event)
-            || event.direct
-            || event.text.starts_with(trigger)
-            || (event.mentioned && config["respondToMentions"] == true)
-            || implicit;
-        if !addressed {
-            return Ok(None);
-        }
-        if implicit {
-            event.mentioned = true;
-        }
         Ok(Some(event))
     }
     pub async fn prepare(&self, bridge: &Bridge, message: &Value) -> Result<Option<Event>> {
-        let Some(mut event) = self.admit(bridge, message).await? else {
-            return Ok(None);
-        };
-        // Literal approval controls have already passed every transport and
-        // Telegram admission gate; never make their broker delivery wait on media.
-        if self.kind != "telegram" || crate::runtime::telegram_approval_control(&event) {
-            return Ok(Some(event));
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::inbound::prepare(self, bridge, message).await;
         }
-        let body = if message["message"].is_object() {
-            &message["message"]
-        } else {
-            message
-        };
-        let config = &bridge.config["telegram"];
-        let trigger = bridge
-            .env
-            .get("TELEGRAM_TRIGGER")
-            .map(String::as_str)
-            .unwrap_or_else(|| crate::config::string(&bridge.config, "trigger"));
-        if config["attachments"]["enabled"] == false {
-            return Ok(Some(event));
-        }
-        let attachments = crate::core::attachments(body);
-        let maximum = config["attachments"]["maxFileBytes"]
-            .as_u64()
-            .unwrap_or(20 * 1024 * 1024)
-            .clamp(1, 20 * 1024 * 1024);
-        let limit = config["attachments"]["maxFilesPerMessage"]
-            .as_u64()
-            .unwrap_or(4)
-            .clamp(1, 16) as usize;
-        let mut headers = Vec::new();
-        for attachment in attachments.as_array().into_iter().flatten().take(limit) {
-            if attachment["size"]
-                .as_u64()
-                .is_some_and(|size| size > maximum)
-            {
-                continue;
-            }
-            let downloaded = self
-                .download_telegram(bridge, &event, attachment, maximum)
-                .await;
-            if let Ok(header) = downloaded {
-                headers.push(header);
-            }
-        }
-        if !headers.is_empty() {
-            let query = event
-                .text
-                .strip_prefix(trigger)
-                .map(str::trim)
-                .unwrap_or(event.text.trim());
-            if !query.starts_with('/') {
-                let query = if query.is_empty() {
-                    "(User sent a file attachment with no message text. Use the attached tool(s) to examine it.)"
-                } else {
-                    query
-                };
-                event.text = format!("{}\n\n{query}", headers.join("\n"));
-                event.mentioned = true;
-            }
-        }
-        Ok(Some(event))
-    }
-    async fn download_telegram(
-        &self,
-        bridge: &Bridge,
-        event: &Event,
-        attachment: &Value,
-        maximum: u64,
-    ) -> Result<String> {
-        let file = self
-            .api("POST", "getFile", json!({"file_id":attachment["fileId"]}))
-            .await?;
-        if file["file_size"]
-            .as_u64()
-            .is_some_and(|size| size > maximum)
-        {
-            bail!("Telegram attachment exceeds size limit");
-        }
-        let path = file["file_path"]
-            .as_str()
-            .context("Telegram file path missing")?;
-        if path.is_empty()
-            || path.len() > 2048
-            || path.contains(['\\', '?', '#'])
-            || path.contains('%')
-            || path.split('/').any(|part| matches!(part, "" | "." | ".."))
-        {
-            bail!("Unsafe Telegram attachment path");
-        }
-        let mut url = url::Url::parse(&self.base)?;
-        url.set_path(&format!(
-            "{}/file/bot{}/{}",
-            url.path().trim_end_matches('/'),
-            self.token,
-            path
-        ));
-        let response = self
-            .client()?
-            .get(url)
-            .send()
-            .await
-            .map_err(|_| anyhow::anyhow!("Telegram file transport failed"))?;
-        if !response.status().is_success() {
-            bail!("Telegram file download rejected");
-        }
-        if response.content_length().is_some_and(|size| size > maximum) {
-            bail!("Telegram file exceeds size limit");
-        }
-        let mut bytes = Vec::new();
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|_| anyhow::anyhow!("Telegram file read failed"))?;
-            if bytes.len() as u64 + chunk.len() as u64 > maximum {
-                bail!("Telegram file exceeds size limit");
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        let original = attachment["fileName"].as_str().unwrap_or(path);
-        let extension = crate::core::extension(
-            &json!(original.rsplit_once('.').map(|(_, extension)| extension)),
-            "bin",
-        );
-        let name = format!("{}.{extension}", uuid::Uuid::new_v4());
-        let uploads = bridge.working_directory(event).join("uploads");
-        let destination = uploads.join(&name);
-        crate::store::write_private(&destination, &bytes)?;
-        Ok(format!(
-            "[Attached file: {} ({}, {} bytes, {}, filename=\"{name}\")]",
-            destination.to_string_lossy(),
-            attachment["mimeType"]
-                .as_str()
-                .unwrap_or("application/octet-stream"),
-            bytes.len(),
-            attachment["kind"].as_str().unwrap_or("document")
-        ))
+        self.admit(bridge, message).await
     }
     pub fn new(kind: &str, base: &str, token: &str, bot: &str, username: &str) -> Self {
         Self {
@@ -279,7 +114,7 @@ impl Platform {
         ));
         Ok(base.to_string())
     }
-    fn client(&self) -> Result<reqwest::Client> {
+    pub(super) fn client(&self) -> Result<reqwest::Client> {
         Ok(reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(40))
@@ -340,59 +175,13 @@ impl Platform {
         bail!("Connector retry exhausted")
     }
     pub fn map(&self, message: &Value) -> Option<Event> {
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::inbound::map(self, message);
+        }
         let mut event = Event::web("", "");
         event.platform = self.kind.clone();
         event.direct = false;
         match self.kind.as_str() {
-            "telegram" => {
-                let body = if message["message"].is_object() {
-                    &message["message"]
-                } else {
-                    message
-                };
-                event.user = scalar(&body["from"]["id"]);
-                event.room = scalar(&body["chat"]["id"]);
-                event.id = format!("{}:{}", event.room, scalar(&body["message_id"]));
-                event.reply_to = body["reply_to_message"]["message_id"]
-                    .as_i64()
-                    .map(|id| id.to_string());
-                event.bot = body["from"]["is_bot"] == true || event.user == self.bot;
-                event.direct = body["chat"]["type"] == "private";
-                if body["is_topic_message"] == true && body["message_thread_id"].is_number() {
-                    event.thread = scalar(&body["message_thread_id"]);
-                }
-                event.text = body["text"]
-                    .as_str()
-                    .or_else(|| body["caption"].as_str())
-                    .unwrap_or("")
-                    .trim()
-                    .into();
-                if let Some(word) = event.text.split_whitespace().next()
-                    && word.starts_with('/')
-                    && let Some((command, target)) = word.split_once('@')
-                    && (2..=33).contains(&command.len())
-                    && command[1..]
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-                {
-                    if self.username.is_empty() || !target.eq_ignore_ascii_case(&self.username) {
-                        return None;
-                    }
-                    let suffix = &event.text[word.len()..];
-                    event.text = format!("{command}{suffix}");
-                    event.mentioned = true;
-                }
-                let mention = format!("@{}", self.username);
-                if !self.username.is_empty()
-                    && event
-                        .text
-                        .to_lowercase()
-                        .starts_with(&mention.to_lowercase())
-                {
-                    event.text = event.text[mention.len()..].trim().into();
-                    event.mentioned = true;
-                }
-            }
             "mattermost" => {
                 if message["event"] != "posted" {
                     return None;
@@ -491,34 +280,17 @@ impl Platform {
         Some(event)
     }
     pub async fn send(&self, event: &Event, text: &str) -> Result<String> {
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::outbound::send(self, event, text).await;
+        }
         let limit = match self.kind.as_str() {
             "discord" => 1900,
-            "telegram" => 4096,
             _ => 3900,
         };
         let mut last = String::new();
-        let chunks = if self.kind == "telegram" {
-            split_lines(text, limit)
-        } else {
-            split(text, limit)
-        };
-        for (index, text) in chunks.into_iter().enumerate() {
+        let chunks = split(text, limit);
+        for text in chunks {
             let (endpoint, body) = match self.kind.as_str() {
-                "telegram" => ("sendMessage".into(), {
-                    let mut body = json!({"chat_id":event.room,"text":text});
-                    if let Ok(thread) = event.thread.parse::<i64>() {
-                        body["message_thread_id"] = thread.into();
-                    } else if index == 0
-                        && !event.direct
-                        && let Some(parent) = event
-                            .reply_to
-                            .as_ref()
-                            .and_then(|id| id.parse::<i64>().ok())
-                    {
-                        body["reply_to_message_id"] = parent.into();
-                    }
-                    body
-                }),
                 "mattermost" => (
                     "posts".into(),
                     json!({"channel_id":event.room,"root_id":event.thread,"message":text}),
@@ -533,17 +305,8 @@ impl Platform {
                 ),
                 _ => bail!("Unknown connector"),
             };
-            let response = match self.api("POST", &endpoint, body.clone()).await {
-                Err(_) if self.kind == "telegram" && body.get("reply_to_message_id").is_some() => {
-                    let mut retry = body;
-                    retry.as_object_mut().unwrap().remove("reply_to_message_id");
-                    self.api("POST", &endpoint, retry).await?
-                }
-                result => result?,
-            };
-            last = scalar(if self.kind == "telegram" {
-                &response["message_id"]
-            } else if self.kind == "slack" {
+            let response = self.api("POST", &endpoint, body).await?;
+            last = scalar(if self.kind == "slack" {
                 &response["ts"]
             } else {
                 &response["id"]
@@ -552,12 +315,10 @@ impl Platform {
         Ok(last)
     }
     pub async fn edit(&self, event: &Event, id: &str, text: &str) -> Result<()> {
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::outbound::edit(self, event, id, text).await;
+        }
         let (method, endpoint, body) = match self.kind.as_str() {
-            "telegram" => (
-                "POST",
-                "editMessageText".into(),
-                json!({"chat_id":event.room,"message_id":id.parse::<i64>()?,"text":text}),
-            ),
             "slack" => (
                 "POST",
                 "chat.update".into(),
@@ -579,6 +340,9 @@ impl Platform {
         Ok(())
     }
     async fn send_activity(&self, event: &Event, text: &str, threaded: bool) -> Result<String> {
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::outbound::send_activity(self, event, text).await;
+        }
         let (endpoint, body) = match self.kind.as_str() {
             "slack" => {
                 let mut body = json!({"channel":event.room,"text":text});
@@ -598,27 +362,59 @@ impl Platform {
                 format!("channels/{}/messages", segment(&event.room)),
                 json!({"content":text,"allowed_mentions":{"parse":[]}}),
             ),
-            "telegram" => {
-                let mut body = json!({"chat_id":event.room,"text":text});
-                if let Ok(thread) = event.thread.parse::<i64>() {
-                    body["message_thread_id"] = thread.into();
-                }
-                ("sendMessage".to_owned(), body)
-            }
+
             _ => bail!("Unknown connector"),
         };
         let result = self.api("POST", &endpoint, body).await?;
         Ok(scalar(if self.kind == "slack" {
             &result["ts"]
-        } else if self.kind == "telegram" {
-            &result["message_id"]
         } else {
             &result["id"]
         }))
     }
+    pub(super) async fn upload_multipart<F>(
+        &self,
+        client: &reqwest::Client,
+        endpoint: &str,
+        name: &str,
+        bytes: Vec<u8>,
+        form: F,
+    ) -> Result<Value>
+    where
+        F: Fn(reqwest::multipart::Part) -> reqwest::multipart::Form,
+    {
+        for attempt in 0..6 {
+            let part = reqwest::multipart::Part::bytes(bytes.clone()).file_name(name.to_owned());
+            let response = self
+                .authorize(client.post(self.url(endpoint)?).multipart(form(part)))
+                .send()
+                .await
+                .map_err(|_| anyhow::anyhow!("Upload transport failed"))?;
+            let status = response.status();
+            let response = read_json(response).await?;
+            if status.as_u16() == 429 || response["error_code"] == 429 {
+                if attempt == 5 {
+                    bail!("Upload rate-limit retries exhausted");
+                }
+                tokio::time::sleep(Duration::from_millis(retry_delay(
+                    response["parameters"]["retry_after"].as_f64(),
+                )))
+                .await;
+                continue;
+            }
+            if !status.is_success() || response["ok"] == false {
+                bail!("Upload rejected");
+            }
+            return Ok(response);
+        }
+        bail!("Upload retry exhausted")
+    }
     pub async fn upload(&self, event: &Event, name: &str, bytes: Vec<u8>) -> Result<()> {
         if bytes.len() > 20 * 1024 * 1024 || name.len() > 256 || name.contains(['/', '\\']) {
             bail!("Invalid upload");
+        }
+        if self.kind == "telegram" {
+            return crate::connectors::telegram::outbound::upload(self, event, name, bytes).await;
         }
         let client = self.client()?;
         if self.kind == "slack" {
@@ -654,52 +450,28 @@ impl Platform {
             return Ok(());
         }
         let endpoint = match self.kind.as_str() {
-            "telegram" => "sendDocument".into(),
             "mattermost" => "files".into(),
             "discord" => format!("channels/{}/messages", segment(&event.room)),
             _ => bail!("Unknown upload connector"),
         };
-        for attempt in 0..6 {
-            let part = reqwest::multipart::Part::bytes(bytes.clone()).file_name(name.to_owned());
-            let form=match self.kind.as_str() {
-                "telegram"=>{ let form=reqwest::multipart::Form::new().text("chat_id",event.room.clone()).part("document",part); if !event.thread.is_empty(){form.text("message_thread_id",event.thread.clone())}else{form} },
-                "mattermost"=>reqwest::multipart::Form::new().text("channel_id",event.room.clone()).part("files",part),
-                _=>reqwest::multipart::Form::new().text("payload_json",json!({"allowed_mentions":{"parse":[]},"attachments":[{"id":0,"filename":name}]}).to_string()).part("files[0]",part),
-            };
-            let response = self
-                .authorize(client.post(self.url(&endpoint)?).multipart(form))
-                .send()
-                .await
-                .map_err(|_| anyhow::anyhow!("Upload transport failed"))?;
-            let status = response.status();
-            let response = read_json(response).await?;
-            if status.as_u16() == 429 || response["error_code"] == 429 {
-                if attempt == 5 {
-                    bail!("Upload rate-limit retries exhausted");
-                }
-                tokio::time::sleep(Duration::from_millis(retry_delay(
-                    response["parameters"]["retry_after"].as_f64(),
-                )))
-                .await;
-                continue;
-            }
-            if !status.is_success() || response["ok"] == false {
-                bail!("Upload rejected");
-            }
-            if self.kind == "mattermost" {
-                self.api("POST","posts",json!({"channel_id":event.room,"root_id":event.thread,"message":name,"file_ids":response["file_infos"].as_array().into_iter().flatten().map(|file|file["id"].clone()).collect::<Vec<_>>()})).await?;
-            }
-            return Ok(());
+        let response = self
+            .upload_multipart(&client, &endpoint, name, bytes, |part| match self.kind.as_str() {
+                "mattermost" => reqwest::multipart::Form::new()
+                    .text("channel_id", event.room.clone())
+                    .part("files", part),
+                "discord" => reqwest::multipart::Form::new()
+                    .text(
+                        "payload_json",
+                        json!({"allowed_mentions":{"parse":[]},"attachments":[{"id":0,"filename":name}]}).to_string(),
+                    )
+                    .part("files[0]", part),
+                _ => unreachable!("Telegram uploads dispatch before shared HTTP multipart"),
+            })
+            .await?;
+        if self.kind == "mattermost" {
+            self.api("POST","posts",json!({"channel_id":event.room,"root_id":event.thread,"message":name,"file_ids":response["file_infos"].as_array().into_iter().flatten().map(|file|file["id"].clone()).collect::<Vec<_>>()})).await?;
         }
-        bail!("Upload retry exhausted")
-    }
-    async fn refuse_telegram_overload(&self, event: Event) -> Result<()> {
-        PlatformSink::new(self.clone(), event)
-            .emit(json!({
-                "type":"notice",
-                "text":"Busy: this message was not accepted or run. Please retry shortly."
-            }))
-            .await
+        Ok(())
     }
     pub async fn run(
         mut self,
@@ -731,106 +503,18 @@ impl Platform {
         let capacity = Arc::new(Semaphore::new(64));
         let mut tasks = tokio::task::JoinSet::new();
         if self.kind == "telegram" {
-            // Keep one bounded lane for approvals so 64 permission-waiting
-            // prompts cannot prevent their own approval or denial.
-            let controls = Arc::new(Semaphore::new(1));
-            let drop_pending = bridge
-                .env
-                .get("TELEGRAM_DROP_PENDING")
-                .is_some_and(|value| value == "1");
-            let _ = tokio::select! {
-                _=shutdown.changed()=>return Ok(()),
-                result=self.api("POST","deleteWebhook",json!({"drop_pending_updates":drop_pending}))=>result,
-            };
-            let mut offset = 0;
-            if drop_pending {
-                let pending = tokio::select! {
-                    _=shutdown.changed()=>return Ok(()),
-                    pending=self.api("POST","getUpdates",json!({"timeout":0,"allowed_updates":["message"]}))=>pending,
-                };
-                if let Ok(pending) = pending {
-                    offset = pending
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|update| update["update_id"].as_i64())
-                        .max()
-                        .map(|id| id.saturating_add(1))
-                        .unwrap_or(0);
-                }
-            }
-            let mut failures = 0u32;
-            'telegram: loop {
-                if *shutdown.borrow() {
-                    break;
-                }
-                let updates = tokio::select! { _=shutdown.changed()=>break, updates=self.api("POST","getUpdates",json!({"offset":offset,"timeout":30,"allowed_updates":["message"]}))=>updates };
-                match updates {
-                    Ok(updates) => {
-                        failures = 0;
-                        for update in updates.as_array().into_iter().flatten() {
-                            let control = self.map(update).is_some_and(|event| {
-                                crate::runtime::telegram_approval_control(&event)
-                            });
-                            let permit = if control {
-                                tokio::select! {
-                                    _ = shutdown.changed() => break 'telegram,
-                                    permit = controls.clone().acquire_owned() => permit.expect("Telegram control semaphore remains open"),
-                                }
-                            } else {
-                                match capacity.clone().try_acquire_owned() {
-                                    Ok(permit) => permit,
-                                    Err(tokio::sync::TryAcquireError::NoPermits) => {
-                                        // Recheck all normal transport/address gates before refusal,
-                                        // but never download media or start a native turn for work refused
-                                        // at this bounded ordinary-capacity boundary.
-                                        if let Some(event) = self.admit(&bridge, update).await? {
-                                            tokio::select! {
-                                                _ = shutdown.changed() => break 'telegram,
-                                                result = self.refuse_telegram_overload(event) => result?,
-                                            }
-                                        }
-                                        if let Some(id) = update["update_id"].as_i64() {
-                                            offset = offset.max(id.saturating_add(1));
-                                        }
-                                        continue;
-                                    }
-                                    Err(tokio::sync::TryAcquireError::Closed) => {
-                                        bail!("Telegram polling semaphore closed")
-                                    }
-                                }
-                            };
-                            if let Some(id) = update["update_id"].as_i64() {
-                                offset = offset.max(id.saturating_add(1));
-                            }
-                            let platform = self.clone();
-                            let bridge = bridge.clone();
-                            let update = update.clone();
-                            tasks.spawn(async move {
-                                let _permit = permit;
-                                if let Ok(Some(event)) = platform.prepare(&bridge, &update).await {
-                                    let sink = PlatformSink::new(platform, event.clone())
-                                        .with_thread_isolation(crate::config::boolean(
-                                            &bridge.config[&event.platform],
-                                            "threadIsolation",
-                                        ));
-                                    let _ = bridge.handle(event, &sink).await;
-                                }
-                            });
-                        }
-                    }
-                    Err(_) => {
-                        failures += 1;
-                        if failures >= 10 {
-                            bail!("Telegram polling retry limit reached");
-                        }
-                        let delay = Duration::from_secs((1u64 << failures.min(5)).min(30));
-                        tokio::select! {_=shutdown.changed()=>break,_=tokio::time::sleep(delay)=>{}}
-                    }
-                }
-                while tasks.try_join_next().is_some() {}
-            }
-        } else {
+            let result = crate::connectors::telegram::poll(
+                self,
+                bridge,
+                &mut shutdown,
+                &capacity,
+                &mut tasks,
+            )
+            .await;
+            tasks.abort_all();
+            return result;
+        }
+        {
             let mut failures = 0u32;
             let mut session_id = String::new();
             let mut sequence = Value::Null;
@@ -1036,7 +720,7 @@ impl Sink for PlatformSink {
             }
             "thinking" => match self.platform.kind.as_str() {
                 "telegram" => {
-                    let _=self.platform.api("POST","sendChatAction",json!({"chat_id":self.event.room,"action":"typing","message_thread_id":self.event.thread.parse::<i64>().ok()})).await;
+                    crate::connectors::telegram::outbound::typing(&self.platform, &self.event).await
                 }
                 "discord" => {
                     let _ = self
@@ -1107,39 +791,6 @@ fn split(text: &str, limit: usize) -> Vec<String> {
     }
     if !current.is_empty() {
         output.push(current);
-    }
-    output
-}
-fn split_lines(text: &str, limit: usize) -> Vec<String> {
-    let mut output = Vec::new();
-    let mut remaining = text;
-    while remaining.encode_utf16().count() > limit {
-        let mut units = 0;
-        let boundary = remaining
-            .char_indices()
-            .find_map(|(offset, character)| {
-                units += character.len_utf16();
-                (units > limit).then_some(offset)
-            })
-            .unwrap_or(remaining.len());
-        let split_at = remaining
-            .char_indices()
-            .take_while(|(offset, _)| *offset <= boundary)
-            .filter(|(_, character)| *character == '\n')
-            .map(|(offset, _)| offset)
-            .last()
-            .filter(|offset| *offset > 0)
-            .unwrap_or(boundary);
-        output.push(remaining[..split_at].to_owned());
-        remaining = remaining[split_at..].trim_start_matches(|character| {
-            matches!(character,
-            '\u{0009}'..='\u{000d}' | '\u{0020}' | '\u{00a0}' | '\u{1680}' |
-            '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' |
-            '\u{205f}' | '\u{3000}' | '\u{feff}')
-        });
-    }
-    if !remaining.is_empty() {
-        output.push(remaining.to_owned());
     }
     output
 }
