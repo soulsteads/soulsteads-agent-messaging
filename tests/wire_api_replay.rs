@@ -463,6 +463,17 @@ fn assert_routing(case: &ProtocolCase, request: &RecordedRequest, id: u64) -> Re
     Ok(())
 }
 
+fn is_tool_activity(case: &ProtocolCase, request: &RecordedRequest) -> bool {
+    if case.kind == "telegram" {
+        return request.path.ends_with(case.activity_path)
+            && output_text(case, request).is_some_and(|text| text == "📖 read — running")
+            && request.body["entities"]
+                .as_array()
+                .is_some_and(|entities| entities.iter().any(|entity| entity["type"] == "bold"));
+    }
+    request.path.ends_with(case.activity_path) && output_text(case, request) == Some("> [read]")
+}
+
 fn assert_activity_routing(case: &ProtocolCase, request: &RecordedRequest) -> Result<()> {
     ensure!(
         request.method == "POST",
@@ -985,8 +996,7 @@ async fn held_turn_cancellation(case: &ProtocolCase) -> Result<()> {
         let activity = running
             .fixture
             .wait_for_request("held prompt activity", |request| {
-                request.path.ends_with(case.activity_path)
-                    && output_text(case, request) == Some("> [read]")
+                is_tool_activity(case, request)
             })
             .await?;
         assert_activity_routing(case, &activity)?;
@@ -1074,9 +1084,7 @@ async fn held_tool_activity(case: &ProtocolCase) -> Result<()> {
         let activity = running
             .fixture
             .wait_for_request("real tool activity", |request| {
-                request.ordinal > prior
-                    && request.path.ends_with(case.activity_path)
-                    && output_text(case, request) == Some("> [read]")
+                request.ordinal > prior && is_tool_activity(case, request)
             })
             .await?;
         assert_activity_routing(case, &activity)?;
@@ -1087,9 +1095,7 @@ async fn held_tool_activity(case: &ProtocolCase) -> Result<()> {
                 .await
                 .iter()
                 .filter(|request| {
-                    request.ordinal >= activity.ordinal
-                        && request.path.ends_with(case.activity_path)
-                        && output_text(case, request) == Some("> [read]")
+                    request.ordinal >= activity.ordinal && is_tool_activity(case, request)
                 })
                 .count()
                 == 1,
@@ -1148,10 +1154,7 @@ async fn held_tool_activity(case: &ProtocolCase) -> Result<()> {
     ensure!(
         requests
             .iter()
-            .filter(|request| {
-                request.path.ends_with(case.activity_path)
-                    && output_text(case, request) == Some("> [read]")
-            })
+            .filter(|request| { is_tool_activity(case, request) })
             .count()
             == 1,
         "duplicate tool activity after {} quiesced: {requests:?}",

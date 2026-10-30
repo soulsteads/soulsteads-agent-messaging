@@ -1,5 +1,5 @@
-use soulsteads_messaging::tools::TurnPresenter;
 use serde_json::{Value, json};
+use soulsteads_messaging::tools::TurnPresenter;
 
 fn options(mode: &str, arguments: bool) -> Value {
     json!({"mode":mode,"showCalls":true,"showArguments":arguments,"showOutputFor":[],"maxTraceEntries":20})
@@ -106,13 +106,14 @@ fn full_path_opt_in_applies_to_every_matrix_activity_style() {
 }
 
 #[test]
-fn other_platforms_keep_their_existing_argument_visibility() {
-    for platform in ["web", "discord", "telegram", "mattermost", "slack", "cli"] {
+fn nontelegram_platforms_keep_their_existing_argument_visibility() {
+    for platform in ["web", "discord", "mattermost", "slack", "cli"] {
         for mode in ["events", "trace", "status", "hermes"] {
             for show_arguments in [false, true] {
                 let update = json!({"sessionUpdate":"tool_call","toolCallId":"read","title":"read","rawInput":{"filePath":"/private/project/config.rs","offset":20,"limit":10}});
                 let config = options(mode, show_arguments);
-                let expected = soulsteads_messaging::tools::Presenter::new(config.clone()).update(&update);
+                let expected =
+                    soulsteads_messaging::tools::Presenter::new(config.clone()).update(&update);
                 let actual = TurnPresenter::new(config, platform, json!({"mode":"auto"}))
                     .with_matrix_full_paths(false)
                     .update(&update);
