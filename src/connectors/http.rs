@@ -646,10 +646,15 @@ impl Platform {
     }
 }
 
+enum Activity {
+    Single(String),
+    Telegram(crate::connectors::telegram::outbound::ToolActivity),
+}
+
 pub struct PlatformSink {
     pub platform: Platform,
     pub event: Event,
-    activities: Mutex<std::collections::HashMap<String, String>>,
+    activities: Mutex<std::collections::HashMap<String, Activity>>,
     activity_threaded: bool,
 }
 impl PlatformSink {
@@ -695,27 +700,87 @@ impl Sink for PlatformSink {
                     .or_else(|| value["message"].as_str())
                     .unwrap_or("");
                 if !text.is_empty() {
-                    self.platform.send(&self.reply_event(), text).await?;
+                    if self.platform.kind == "telegram"
+                        && value["toolPresentation"]["kind"] == "tool_output"
+                    {
+                        crate::connectors::telegram::outbound::send_tool_output(
+                            &self.platform,
+                            &self.reply_event(),
+                            &value["toolPresentation"],
+                            text,
+                        )
+                        .await?;
+                    } else {
+                        self.platform.send(&self.reply_event(), text).await?;
+                    }
                 }
             }
             "activity" | "activity_update" => {
                 let key = scalar(&value["activityId"]);
                 let text = format!("> {}", value["message"].as_str().unwrap_or("tool"));
+                let presentation = if matches!(
+                    value["toolPresentation"]["kind"].as_str(),
+                    Some("tool_call" | "tool_page")
+                ) {
+                    &value["toolPresentation"]
+                } else {
+                    &value["telegramPresentation"]
+                };
+                let native = self.platform.kind == "telegram"
+                    && matches!(
+                        presentation["kind"].as_str(),
+                        Some("tool_call" | "tool_page")
+                    );
                 let mut activities = self.activities.lock().await;
-                if let Some(id) = activities.get(&key) {
-                    if self.platform.edit(&self.event, id, &text).await.is_err() {
-                        let id = self
-                            .platform
-                            .send_activity(&self.event, &text, self.activity_threaded)
+                if let Some(activity) = activities.get_mut(&key) {
+                    match activity {
+                        Activity::Telegram(activity) if native => {
+                            crate::connectors::telegram::outbound::sync_tool_activity(
+                                &self.platform,
+                                &self.event,
+                                activity,
+                                presentation,
+                            )
                             .await?;
-                        activities.insert(key, id);
+                        }
+                        Activity::Single(id) => {
+                            if self.platform.edit(&self.event, id, &text).await.is_err() {
+                                let id = self
+                                    .platform
+                                    .send_activity(&self.event, &text, self.activity_threaded)
+                                    .await?;
+                                *activity = Activity::Single(id);
+                            }
+                        }
+                        Activity::Telegram(_) => {
+                            // A native activity remains native for its lifetime.
+                        }
                     }
+                } else if native {
+                    // Insert the native state before the first transport call: a
+                    // later chunk can fail after earlier sends have succeeded.
+                    activities.insert(
+                        key.clone(),
+                        Activity::Telegram(
+                            crate::connectors::telegram::outbound::ToolActivity::empty(),
+                        ),
+                    );
+                    let Activity::Telegram(activity) = activities.get_mut(&key).unwrap() else {
+                        unreachable!("native activity inserted above")
+                    };
+                    crate::connectors::telegram::outbound::sync_tool_activity(
+                        &self.platform,
+                        &self.event,
+                        activity,
+                        presentation,
+                    )
+                    .await?;
                 } else {
                     let id = self
                         .platform
                         .send_activity(&self.event, &text, self.activity_threaded)
                         .await?;
-                    activities.insert(key, id);
+                    activities.insert(key, Activity::Single(id));
                 }
             }
             "thinking" => match self.platform.kind.as_str() {
