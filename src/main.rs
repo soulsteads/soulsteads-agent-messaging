@@ -72,6 +72,9 @@ async fn start() -> Result<()> {
         println!("Configuration loaded successfully; no connectors started.");
         return Ok(());
     }
+    if configuration["a2a"]["enabled"] == true {
+        bail!("A2A is configuration-only; serving is not implemented");
+    }
     bridge.prepare_agent_tools().await?;
     if !arguments.serve {
         let console = Console::new(!arguments.no_images);

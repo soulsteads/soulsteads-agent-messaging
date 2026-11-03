@@ -11,6 +11,7 @@ default-run = "soulsteads-messaging"
 # Requires the separately supplied, pinned TypeScript test reference and Bun.
 reference-conformance = []
 agent-network = []
+a2a = ["dep:a2a-core", "dep:a2a-client", "dep:a2a-server"]
 default = ["platform-sdks", "matrix-encryption"]
 platform-sdks = ["dep:matrix-sdk", "dep:whatsapp-rust", "dep:whatsapp-rust-sqlite-storage", "dep:qrcode"]
 matrix-encryption = ["platform-sdks", "matrix-sdk/e2e-encryption", "matrix-sdk/automatic-room-key-forwarding"]
@@ -43,6 +44,9 @@ name = "acp-fixture"
 path = "tests/fixtures/acp.rs"
 
 [dependencies]
+a2a-core = { package = "a2a-lf", version = "=0.4.2", optional = true }
+a2a-client = { package = "a2a-client-lf", version = "=0.2.9", optional = true, default-features = false }
+a2a-server = { package = "a2a-server-lf", version = "=0.5.3", optional = true, default-features = false }
 anyhow = "1"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["ws", "multipart"] }
