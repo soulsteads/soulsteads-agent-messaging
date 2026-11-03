@@ -1,9 +1,11 @@
 use crate::config::string;
 use serde_json::{Value, json};
+use std::io::{self, Write};
 
 pub struct OutputPresenter {
     options: Value,
     platform: String,
+    connector_presentation: bool,
     seen: std::collections::HashMap<String, usize>,
     sent: std::collections::HashSet<String>,
 }
@@ -11,6 +13,7 @@ impl OutputPresenter {
     pub fn new(options: Value, platform: &str) -> Self {
         Self {
             options,
+            connector_presentation: connector_presentation(platform),
             platform: platform.into(),
             seen: Default::default(),
             sent: Default::default(),
@@ -104,7 +107,14 @@ impl OutputPresenter {
             if self.sent.len() >= 1024 || !self.sent.insert(key) {
                 return None;
             }
-            Some(json!({"type":"response","text":text}))
+            let mut event = json!({"type":"response","text":text});
+            if self.connector_presentation {
+                event["toolPresentation"] = json!({
+                    "kind":"tool_output",
+                    "tool":bounded_presentation_text(tool)
+                });
+            }
+            Some(event)
         } else {
             Some(json!({"type":kind,"tool":tool,"text":text}))
         }
@@ -124,7 +134,8 @@ impl TurnPresenter {
     pub fn new(options: Value, platform: &str, policy: Value) -> Self {
         let enabled =
             platform == "matrix" && matches!(policy["mode"].as_str(), Some("auto" | "always"));
-        let mut calls = Presenter::new(options.clone());
+        let mut calls = Presenter::new(options.clone())
+            .with_connector_presentation(connector_presentation(platform));
         calls.matrix_file_paths = (platform == "matrix").then_some(false);
         Self {
             calls,
@@ -222,8 +233,10 @@ impl TurnPresenter {
 pub struct Presenter {
     options: Value,
     matrix_file_paths: Option<bool>,
+    connector_presentation: bool,
     entries: Vec<Value>,
     pages: std::collections::HashMap<usize, String>,
+    event_states: std::collections::HashMap<String, String>,
     started: std::collections::HashSet<String>,
     last_event: String,
     fallback_sequence: usize,
@@ -234,13 +247,19 @@ impl Presenter {
         Self {
             options,
             matrix_file_paths: None,
+            connector_presentation: false,
             entries: vec![],
             pages: Default::default(),
+            event_states: Default::default(),
             started: Default::default(),
             last_event: String::new(),
             fallback_sequence: 0,
             last_fallback: None,
         }
+    }
+    fn with_connector_presentation(mut self, enabled: bool) -> Self {
+        self.connector_presentation = enabled;
+        self
     }
     pub fn update(&mut self, update: &Value) -> Vec<Value> {
         let mode = if self.options["showCalls"] == false {
@@ -393,7 +412,7 @@ impl Presenter {
         }
         .into();
         if mode == "events" {
-            if self.started.contains(&id)
+            if (!self.connector_presentation && self.started.contains(&id))
                 || (entry["description"] == ""
                     && !matches!(entry["status"].as_str(), Some("completed" | "failed")))
             {
@@ -412,11 +431,22 @@ impl Presenter {
             } else {
                 format!("[{}]", string(entry, "tool"))
             };
-            if self.last_event == message {
+            if !self.connector_presentation && self.last_event == message {
                 return vec![];
             }
             self.last_event = message.clone();
-            return vec![json!({"type":"activity","activityId":id,"message":message})];
+            let mut event = json!({"type":"activity","activityId":id,"message":message});
+            if self.connector_presentation {
+                let presentation =
+                    tool_activity_presentation(entry, self.options["showArguments"] == true);
+                if self.event_states.get(&id) == Some(&presentation.to_string()) {
+                    return vec![];
+                }
+                self.event_states
+                    .insert(id.clone(), presentation.to_string());
+                event["toolPresentation"] = presentation;
+            }
+            return vec![event];
         }
         let maximum = self.options["maxTraceEntries"]
             .as_u64()
@@ -514,9 +544,36 @@ impl Presenter {
                         .join("\n")
                 )
             };
-            if self.pages.get(&page) != Some(&message) {
-                self.pages.insert(page, message.clone());
-                output.push(json!({"type":"activity","activityId":format!("trace:{page}"),"message":message}));
+            let mut event =
+                json!({"type":"activity","activityId":format!("trace:{page}"),"message":message});
+            let key = if self.connector_presentation {
+                let presentation = tool_page_presentation(
+                    mode,
+                    entries,
+                    self.options["showArguments"] == true,
+                    completed,
+                    active,
+                    page,
+                    page_count,
+                );
+                // Native rendering consumes status and literal metadata, not
+                // just the legacy message. In particular Hermes messages do
+                // not change when a running tool completes.
+                let mut visible = presentation.clone();
+                if mode != "status" {
+                    // Non-status pages use only whether work remains, not the
+                    // arguments of an active tool on another page.
+                    visible["active"] = (!presentation["active"].is_null()).into();
+                    visible.as_object_mut().unwrap().remove("completed");
+                }
+                event["toolPresentation"] = presentation;
+                visible.to_string()
+            } else {
+                message
+            };
+            if self.pages.get(&page) != Some(&key) {
+                self.pages.insert(page, key);
+                output.push(event);
             }
         }
         output
@@ -697,6 +754,209 @@ pub fn compact(text: &str, path: bool) -> String {
     } else {
         format!("{}…", String::from_utf16_lossy(&units[..179]))
     }
+}
+/// Connector metadata is literal text for native renderers, not a raw-input clone.
+/// Serialization stops at the bounded presentation sink rather than allocating a
+/// whole JSON string before selecting a visible prefix.
+pub const PRESENTATION_UTF16_LIMIT: usize = 180;
+const TRUNCATED_PRESENTATION_SUFFIX: &str = "… (truncated)";
+const PRESENTATION_PREFIX_UTF16_LIMIT: usize =
+    PRESENTATION_UTF16_LIMIT - TRUNCATED_PRESENTATION_SUFFIX.len();
+const MAX_UTF8_BYTES_PER_UTF16_UNIT: usize = 3;
+const MAX_PRESENTATION_JSON_STRING_BYTES: usize =
+    2 + 2 * MAX_UTF8_BYTES_PER_UTF16_UNIT * PRESENTATION_UTF16_LIMIT;
+const MAX_STATUS_JSON_BYTES: usize = "\"completed\"".len();
+const TOOL_CALL_PRESENTATION_FIXED_BYTES: usize =
+    br#"{"kind":"tool_call","tool":,"status":,"arguments":}"#.len();
+const TOOL_PAGE_PRESENTATION_FIXED_BYTES: usize =
+    br#"{"kind":"tool_page","mode":,"entries":[],"completed":1024,"active":,"page":1024,"pages":1024}"#.len();
+const TOOL_CALL_MAX_WIRE_BYTES: usize = TOOL_CALL_PRESENTATION_FIXED_BYTES
+    + MAX_PRESENTATION_JSON_STRING_BYTES * 2
+    + MAX_STATUS_JSON_BYTES;
+/// Worst-case JSON wire bytes for a 1024-entry page plus a duplicated active
+/// entry. Every bounded source string is at most 180 UTF-16 units, each unit is
+/// at most three UTF-8 bytes, and JSON can double each byte for quotes/backslashes.
+pub const TOOL_PAGE_MAX_WIRE_BYTES: usize = TOOL_PAGE_PRESENTATION_FIXED_BYTES
+    + MAX_PRESENTATION_JSON_STRING_BYTES
+    + 1024 * (TOOL_CALL_MAX_WIRE_BYTES + 1)
+    + TOOL_CALL_MAX_WIRE_BYTES;
+
+struct BoundedJsonWriter {
+    output: String,
+    pending: Vec<u8>,
+    used_utf16: usize,
+    limit_utf16: usize,
+    truncated: bool,
+    #[cfg(test)]
+    accepted_bytes: usize,
+}
+impl BoundedJsonWriter {
+    fn new(limit_utf16: usize) -> Self {
+        Self {
+            output: String::new(),
+            pending: Vec::new(),
+            used_utf16: 0,
+            limit_utf16,
+            truncated: false,
+            #[cfg(test)]
+            accepted_bytes: 0,
+        }
+    }
+    fn append_valid(&mut self, text: &str) -> io::Result<()> {
+        for character in text.chars() {
+            let width = character.len_utf16();
+            if self.used_utf16 + width > self.limit_utf16 {
+                self.truncated = true;
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "bounded tool presentation",
+                ));
+            }
+            self.output.push(character);
+            self.used_utf16 += width;
+            #[cfg(test)]
+            {
+                self.accepted_bytes += character.len_utf8();
+            }
+        }
+        Ok(())
+    }
+}
+impl Write for BoundedJsonWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.truncated {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "bounded tool presentation",
+            ));
+        }
+        let mut remaining = bytes;
+        if !self.pending.is_empty() {
+            let mut partial = std::mem::take(&mut self.pending);
+            let take = (4 - partial.len()).min(remaining.len());
+            partial.extend_from_slice(&remaining[..take]);
+            match std::str::from_utf8(&partial) {
+                Ok(text) => {
+                    self.append_valid(text)?;
+                    remaining = &remaining[take..];
+                }
+                Err(error) if error.error_len().is_none() => {
+                    self.pending = partial;
+                    return Ok(bytes.len());
+                }
+                Err(_) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "serializer wrote invalid UTF-8",
+                    ));
+                }
+            }
+        }
+        match std::str::from_utf8(remaining) {
+            Ok(text) => self.append_valid(text)?,
+            Err(error) if error.error_len().is_none() => {
+                let valid = error.valid_up_to();
+                self.append_valid(
+                    std::str::from_utf8(&remaining[..valid]).expect("valid UTF-8 prefix"),
+                )?;
+                self.pending.extend_from_slice(&remaining[valid..]);
+            }
+            Err(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "serializer wrote invalid UTF-8",
+                ));
+            }
+        }
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+fn bounded_presentation_text(text: &str) -> String {
+    let mut output = String::new();
+    let mut used = 0;
+    for character in text.chars() {
+        let width = character.len_utf16();
+        if used + width > PRESENTATION_UTF16_LIMIT {
+            let prefix = scalar_prefix(&output, PRESENTATION_PREFIX_UTF16_LIMIT);
+            return format!("{prefix}{TRUNCATED_PRESENTATION_SUFFIX}");
+        }
+        output.push(character);
+        used += width;
+    }
+    output
+}
+fn scalar_prefix(text: &str, limit_utf16: usize) -> String {
+    let mut output = String::new();
+    let mut used = 0;
+    for character in text.chars() {
+        let width = character.len_utf16();
+        if used + width > limit_utf16 {
+            break;
+        }
+        output.push(character);
+        used += width;
+    }
+    output
+}
+fn literal_arguments(arguments: &Value) -> String {
+    let mut writer = BoundedJsonWriter::new(PRESENTATION_UTF16_LIMIT);
+    let result = serde_json::to_writer(&mut writer, arguments);
+    if result.is_ok() {
+        return writer.output;
+    }
+    if writer.truncated {
+        return format!(
+            "{}{}",
+            scalar_prefix(&writer.output, PRESENTATION_PREFIX_UTF16_LIMIT),
+            TRUNCATED_PRESENTATION_SUFFIX
+        );
+    }
+    "null".into()
+}
+/// Trusted labels for platform renderers. Operational text remains separate
+/// and must be sent literally by the renderer, never parsed as Markdown.
+pub fn rich_tool_header(tool: &str, status: &str) -> String {
+    let label = match tool.to_ascii_lowercase().as_str() {
+        "bash" | "terminal" | "shell" | "exec" => "💻 terminal".into(),
+        "read" | "read_file" | "readfile" => "📖 read".into(),
+        "edit" | "write" | "write_file" | "apply_patch" | "patch" | "multiedit" => "🔧 edit".into(),
+        "grep" | "glob" | "search_files" => "🔎 search".into(),
+        _ => format!("⚙️ {}", bounded_presentation_text(tool)),
+    };
+    format!("{label} — {status}")
+}
+fn tool_activity_presentation(entry: &Value, arguments_visible: bool) -> Value {
+    json!({
+        "kind":"tool_call",
+        "tool":bounded_presentation_text(entry["tool"].as_str().unwrap_or("unknown")),
+        "status":bounded_presentation_text(entry["status"].as_str().unwrap_or("pending")),
+        "arguments":arguments_visible.then(|| literal_arguments(&entry["details"]))
+    })
+}
+fn tool_page_presentation(
+    mode: &str,
+    entries: &[Value],
+    arguments_visible: bool,
+    completed: usize,
+    active: Option<&Value>,
+    page: usize,
+    pages: usize,
+) -> Value {
+    json!({
+        "kind":"tool_page",
+        "mode":bounded_presentation_text(mode),
+        "entries":entries.iter().map(|entry| tool_activity_presentation(entry, arguments_visible)).collect::<Vec<_>>(),
+        "completed":completed,
+        "active":active.map(|entry| tool_activity_presentation(entry, arguments_visible)),
+        "page":page + 1,
+        "pages":pages,
+    })
+}
+fn connector_presentation(platform: &str) -> bool {
+    platform == "telegram"
 }
 pub fn hermes(entry: &Value, arguments: bool) -> String {
     let first = |keys: &[&str]| {
@@ -885,5 +1145,21 @@ mod terminal_presentation_tests {
         let event = output.iter().find(|e| e["type"] == "response").unwrap();
         assert_eq!(event["terminalToolCallId"], "opaque");
         assert!(event["text"].as_str().unwrap().encode_utf16().count() <= 2020);
+    }
+
+    #[test]
+    fn bounded_json_writer_stops_serializer_and_handles_split_utf8() {
+        let huge = json!({"escaped": "\\\"\\\\\n".repeat(100_000)});
+        let mut writer = BoundedJsonWriter::new(PRESENTATION_UTF16_LIMIT);
+        assert!(serde_json::to_writer(&mut writer, &huge).is_err());
+        assert!(writer.truncated);
+        assert!(writer.accepted_bytes < 1_000, "{}", writer.accepted_bytes);
+
+        let mut split = BoundedJsonWriter::new(2);
+        split.write_all(&[0xf0, 0x9f]).unwrap();
+        split.write_all(&[0x98, 0x80]).unwrap();
+        assert_eq!(split.output, "😀");
+        assert_eq!(split.used_utf16, 2);
+        assert!(split.write_all(b"x").is_err());
     }
 }
