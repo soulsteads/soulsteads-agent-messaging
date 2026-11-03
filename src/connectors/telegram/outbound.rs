@@ -2,8 +2,59 @@ use crate::{
     connectors::http::{Platform, scalar},
     runtime::Event,
 };
-use anyhow::Result;
+use anyhow::{Error, Result};
 use serde_json::{Value, json};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TelegramApiRejectionKind {
+    EditTargetMissing,
+    Unchanged,
+    DeleteTargetMissing,
+}
+
+#[derive(Debug)]
+struct TelegramApiRejection {
+    kind: TelegramApiRejectionKind,
+}
+
+impl std::fmt::Display for TelegramApiRejection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("telegram API rejected request (400)")
+    }
+}
+
+impl std::error::Error for TelegramApiRejection {}
+
+pub(crate) fn classify_api_rejection(
+    method: &str,
+    endpoint: &str,
+    status: u16,
+    body: &Value,
+) -> Option<Error> {
+    if method != "POST"
+        || status != 400
+        || body["ok"] != false
+        || body["error_code"].as_i64() != Some(400)
+    {
+        return None;
+    }
+    let description = body["description"].as_str()?;
+    let kind = match (endpoint, description) {
+        ("editMessageText", "Bad Request: message to edit not found") => {
+            TelegramApiRejectionKind::EditTargetMissing
+        }
+        ("editMessageText", "Bad Request: message is not modified")
+        | (
+            "editMessageText",
+            "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message",
+        ) => TelegramApiRejectionKind::Unchanged,
+        ("deleteMessage", "Bad Request: message to delete not found") => {
+            TelegramApiRejectionKind::DeleteTargetMissing
+        }
+        _ => return None,
+    };
+    Some(Error::new(TelegramApiRejection { kind }))
+}
 
 #[derive(Clone, PartialEq, Eq)]
 struct Entity {
@@ -332,7 +383,25 @@ pub(crate) async fn sync_tool_activity(
     let shared = activity.chunks.len().min(wanted.len());
     for (existing, rendered) in activity.chunks[..shared].iter_mut().zip(&wanted[..shared]) {
         if existing.rendered != *rendered {
-            edit_tool_chunk(platform, event, &existing.id, rendered).await?;
+            match edit_tool_chunk(platform, event, &existing.id, rendered).await {
+                Ok(()) => {}
+                Err(error)
+                    if error
+                        .downcast_ref::<TelegramApiRejection>()
+                        .is_some_and(|rejection| {
+                            rejection.kind == TelegramApiRejectionKind::Unchanged
+                        }) => {}
+                Err(error)
+                    if error
+                        .downcast_ref::<TelegramApiRejection>()
+                        .is_some_and(|rejection| {
+                            rejection.kind == TelegramApiRejectionKind::EditTargetMissing
+                        }) =>
+                {
+                    existing.id = send_tool_chunk(platform, event, rendered).await?;
+                }
+                Err(error) => return Err(error),
+            }
             existing.rendered = rendered.clone();
         }
     }
@@ -345,13 +414,22 @@ pub(crate) async fn sync_tool_activity(
     }
     while activity.chunks.len() > wanted.len() {
         let obsolete = activity.chunks.last().unwrap();
-        platform
+        let result = platform
             .api(
                 "POST",
                 "deleteMessage",
                 json!({"chat_id":event.room,"message_id":obsolete.id.parse::<i64>()?}),
             )
-            .await?;
+            .await;
+        if let Err(error) = result
+            && !error
+                .downcast_ref::<TelegramApiRejection>()
+                .is_some_and(|rejection| {
+                    rejection.kind == TelegramApiRejectionKind::DeleteTargetMissing
+                })
+        {
+            return Err(error);
+        }
         activity.chunks.pop();
     }
     Ok(())

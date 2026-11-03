@@ -30,6 +30,8 @@ struct TelegramFixture {
     messages: Arc<Mutex<BTreeMap<i64, Value>>>,
     next_id: Arc<AtomicI64>,
     failures: Arc<Mutex<BTreeSet<usize>>>,
+    responses: Arc<Mutex<BTreeMap<usize, (StatusCode, Value)>>>,
+    lost_responses: Arc<Mutex<BTreeSet<usize>>>,
 }
 
 impl Deref for TelegramFixture {
@@ -58,6 +60,9 @@ async fn endpoint(State(fixture): State<TelegramFixture>, request: Request) -> i
         )
             .into_response();
     }
+    if let Some((status, value)) = fixture.responses.lock().await.remove(&ordinal) {
+        return (status, axum::Json(value)).into_response();
+    }
     let result = if path.ends_with("/sendMessage") {
         let id = fixture.next_id.fetch_add(1, Ordering::SeqCst);
         fixture.messages.lock().await.insert(id, body);
@@ -66,17 +71,42 @@ async fn endpoint(State(fixture): State<TelegramFixture>, request: Request) -> i
         let id = body["message_id"].as_i64().unwrap();
         let mut messages = fixture.messages.lock().await;
         if !messages.contains_key(&id) {
-            return (StatusCode::BAD_REQUEST, axum::Json(json!({"ok":false}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(json!({"ok":false,"error_code":400,"description":"Bad Request: message to edit not found"})),
+            )
+                .into_response();
+        }
+        let current = &messages[&id];
+        if current["text"] == body["text"] && current["entities"] == body["entities"] {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(json!({"ok":false,"error_code":400,"description":"Bad Request: message is not modified"})),
+            )
+                .into_response();
         }
         messages.insert(id, body);
         json!({"message_id":id})
     } else if path.ends_with("/deleteMessage") {
         let id = body["message_id"].as_i64().unwrap();
-        fixture.messages.lock().await.remove(&id);
+        if fixture.messages.lock().await.remove(&id).is_none() {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(json!({"ok":false,"error_code":400,"description":"Bad Request: message to delete not found"})),
+            )
+                .into_response();
+        }
         json!(true)
     } else {
         json!(true)
     };
+    if fixture.lost_responses.lock().await.remove(&ordinal) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(json!({"ok":false})),
+        )
+            .into_response();
+    }
     (
         StatusCode::OK,
         axum::Json(json!({"ok":true,"result":result})),
@@ -106,6 +136,8 @@ async fn fixture_with_failures(
         messages: Arc::default(),
         next_id: Arc::new(AtomicI64::new(100)),
         failures: Arc::new(Mutex::new(failures.iter().copied().collect())),
+        responses: Arc::default(),
+        lost_responses: Arc::default(),
     };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -400,6 +432,221 @@ async fn telegram_partial_edit_retry_keeps_successful_chunks_and_converges_store
             .is_some_and(|text| !text.contains("— running"))
     }));
     drop(requests);
+    server.abort();
+}
+
+#[tokio::test]
+async fn telegram_deleted_tool_activity_is_recreated_on_completion() {
+    let (platform, event, fixture, server) = fixture().await;
+    let sink = PlatformSink::new(platform, event);
+    let started = json!({"type":"activity","activityId":"deleted","message":"ignored","toolPresentation":{
+        "kind":"tool_call","tool":"bash","status":"running","arguments":"private marker"
+    }});
+    sink.emit(started).await.unwrap();
+    fixture.messages.lock().await.remove(&100);
+    let completed = json!({"type":"activity","activityId":"deleted","message":"ignored","toolPresentation":{
+        "kind":"tool_call","tool":"bash","status":"completed","arguments":"private marker"
+    }});
+    sink.emit(completed).await.unwrap();
+
+    let requests = fixture.requests.lock().await;
+    assert_eq!(requests.len(), 3);
+    assert!(requests[1].0.ends_with("/editMessageText"));
+    assert!(requests[2].0.ends_with("/sendMessage"));
+    let ids = fixture
+        .messages
+        .lock()
+        .await
+        .keys()
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(ids, vec![101], "replacement message ID is retained");
+    assert!(
+        fixture.messages.lock().await[&101]["text"]
+            .as_str()
+            .unwrap()
+            .contains("completed")
+    );
+    drop(requests);
+    let follow_up = json!({"type":"activity","activityId":"deleted","message":"ignored","toolPresentation":{
+        "kind":"tool_call","tool":"bash","status":"failed","arguments":"private marker"
+    }});
+    sink.emit(follow_up).await.unwrap();
+    let requests = fixture.requests.lock().await;
+    assert!(requests[3].0.ends_with("/editMessageText"));
+    assert_eq!(requests[3].1["message_id"], 101);
+    drop(requests);
+    server.abort();
+}
+
+#[tokio::test]
+async fn telegram_deleted_first_activity_chunk_is_replaced_without_changing_other_ids() {
+    let (platform, event, fixture, server) = fixture().await;
+    let sink = PlatformSink::new(platform, event);
+    let entries = |status| {
+        (0..40)
+            .map(|index| {
+                json!({"tool":"bash", "status":status,
+                "arguments":format!("{index}-{}", "😀<b>```".repeat(90))})
+            })
+            .collect::<Vec<_>>()
+    };
+    let page = |entries| {
+        json!({"type":"activity","activityId":"missing-first","message":"ignored","toolPresentation":{
+            "kind":"tool_page","mode":"trace","entries":entries,"completed":0,"active":null,"page":1,"pages":1
+        }})
+    };
+    sink.emit(page(entries("running"))).await.unwrap();
+    let original_ids = fixture
+        .messages
+        .lock()
+        .await
+        .keys()
+        .copied()
+        .collect::<Vec<_>>();
+    assert!(original_ids.len() > 2);
+    fixture.messages.lock().await.remove(&original_ids[0]);
+
+    sink.emit(page(entries("completed"))).await.unwrap();
+    let messages = fixture.messages.lock().await;
+    let replacement = *messages
+        .keys()
+        .find(|id| **id > *original_ids.last().unwrap())
+        .unwrap();
+    for old_id in &original_ids[1..] {
+        assert!(
+            messages.contains_key(old_id),
+            "unaffected chunk {old_id} keeps its ID"
+        );
+        assert!(
+            messages[old_id]["text"]
+                .as_str()
+                .unwrap()
+                .contains("completed")
+        );
+    }
+    assert!(
+        messages[&replacement]["text"]
+            .as_str()
+            .unwrap()
+            .contains("completed")
+    );
+    assert_eq!(messages.len(), original_ids.len());
+    let requests = fixture.requests.lock().await;
+    let tail = &requests[original_ids.len()..];
+    assert!(tail[0].0.ends_with("/editMessageText"));
+    assert!(tail[1].0.ends_with("/sendMessage"));
+    assert!(
+        tail[2..]
+            .iter()
+            .all(|(path, _)| path.ends_with("/editMessageText"))
+    );
+    drop(requests);
+    server.abort();
+}
+
+#[tokio::test]
+async fn telegram_unrecognized_edit_rejections_are_not_retried_as_missing_messages() {
+    let controls = [
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"ok":false,"error_code":400,"description":"Bad Request: unrelated"}),
+        ),
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"ok":false,"error_code":401,"description":"Bad Request: message to edit not found"}),
+        ),
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok":false,"error_code":400,"description":"Bad Request: message to edit not found"}),
+        ),
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"error_code":400,"description":"Bad Request: message to edit not found"}),
+        ),
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"ok":true,"error_code":400,"description":"Bad Request: message to edit not found"}),
+        ),
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"ok":false,"error_code":400,"description":"Bad Request: message is not modified: arbitrary extension"}),
+        ),
+    ];
+    for (status, body) in controls {
+        let (platform, event, fixture, server) = fixture().await;
+        let sink = PlatformSink::new(platform, event);
+        let activity = |state| {
+            json!({"type":"activity","activityId":"reject-control","message":"ignored","toolPresentation":{
+                "kind":"tool_call","tool":"bash","status":state,"arguments":"private marker"
+            }})
+        };
+        sink.emit(activity("running")).await.unwrap();
+        fixture.responses.lock().await.insert(2, (status, body));
+        assert!(sink.emit(activity("completed")).await.is_err());
+        let requests = fixture.requests.lock().await;
+        assert_eq!(requests.len(), 2, "no resend for response mismatch");
+        assert!(requests[1].0.ends_with("/editMessageText"));
+        assert_eq!(fixture.messages.lock().await.len(), 1);
+        drop(requests);
+        server.abort();
+    }
+}
+
+#[tokio::test]
+async fn telegram_edit_and_delete_lost_responses_converge_on_retry() {
+    let (platform, event, fixture, server) = fixture().await;
+    let sink = PlatformSink::new(platform, event);
+    let entries = |status, count| {
+        (0..count)
+            .map(|index| {
+                json!({
+                    "tool":"bash", "status":status,
+                    "arguments":format!("{index}-{}", "😀<b>```".repeat(90))
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    let page = |values| {
+        json!({"type":"activity","activityId":"lost-response","message":"ignored","toolPresentation":{
+            "kind":"tool_page","mode":"trace","entries":values,"completed":0,"active":null,"page":1,"pages":1
+        }})
+    };
+    sink.emit(page(entries("running", 40))).await.unwrap();
+    let edit_ordinal = fixture.requests.lock().await.len() + 1;
+    fixture.lost_responses.lock().await.insert(edit_ordinal);
+    assert!(sink.emit(page(entries("completed", 40))).await.is_err());
+    let retry_ordinal = fixture.requests.lock().await.len() + 1;
+    fixture.responses.lock().await.insert(
+        retry_ordinal,
+        (
+            StatusCode::BAD_REQUEST,
+            json!({"ok":false,"error_code":400,"description":"Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message"}),
+        ),
+    );
+    sink.emit(page(entries("completed", 40))).await.unwrap();
+    assert!(
+        fixture
+            .messages
+            .lock()
+            .await
+            .values()
+            .all(|body| body["text"].as_str().unwrap().contains("completed"))
+    );
+
+    let count = fixture.requests.lock().await.len();
+    fixture.lost_responses.lock().await.insert(count + 2);
+    assert!(sink.emit(page(entries("completed", 1))).await.is_err());
+    sink.emit(page(entries("completed", 1))).await.unwrap();
+    assert_eq!(fixture.messages.lock().await.len(), 1);
+    assert!(
+        fixture
+            .messages
+            .lock()
+            .await
+            .values()
+            .all(|body| body["text"].as_str().unwrap().contains("completed"))
+    );
     server.abort();
 }
 
