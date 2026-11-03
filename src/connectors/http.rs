@@ -14,6 +14,7 @@ pub struct Platform {
     pub bot: String,
     pub username: String,
 }
+
 impl Platform {
     async fn admit(&self, bridge: &Bridge, message: &Value) -> Result<Option<Event>> {
         if self.kind == "telegram" {
@@ -164,6 +165,17 @@ impl Platform {
                 continue;
             }
             if !status.is_success() || value["ok"] == false {
+                if self.kind == "telegram"
+                    && let Some(error) =
+                        crate::connectors::telegram::outbound::classify_api_rejection(
+                            method,
+                            endpoint,
+                            status.as_u16(),
+                            &value,
+                        )
+                {
+                    return Err(error);
+                }
                 bail!("{} API rejected request ({})", self.kind, status.as_u16());
             }
             return Ok(if self.kind == "telegram" {
