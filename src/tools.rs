@@ -8,6 +8,7 @@ pub struct OutputPresenter {
     connector_presentation: bool,
     seen: std::collections::HashMap<String, usize>,
     sent: std::collections::HashSet<String>,
+    connector_tools: std::collections::HashMap<String, String>,
 }
 impl OutputPresenter {
     pub fn new(options: Value, platform: &str) -> Self {
@@ -17,17 +18,49 @@ impl OutputPresenter {
             platform: platform.into(),
             seen: Default::default(),
             sent: Default::default(),
+            connector_tools: Default::default(),
         }
     }
     pub fn update(&mut self, update: &Value) -> Option<Value> {
+        let name = update["title"]
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .or_else(|| update["name"].as_str().filter(|name| !name.is_empty()));
+        // Bound retained keys in UTF-8 bytes; do not normalize an ACP identity.
+        let call_id = update["toolCallId"]
+            .as_str()
+            .filter(|id| !id.is_empty() && id.len() <= 1024);
+        let terminal = matches!(update["status"].as_str(), Some("completed" | "failed"));
+        // ACP completion updates may omit their title. Retain only bounded
+        // connector labels, independently of call/argument visibility. Other
+        // platforms keep their existing output-selection behavior.
+        if self.connector_presentation
+            && update["sessionUpdate"] == "tool_call"
+            && let Some(id) = call_id
+        {
+            self.connector_tools.remove(id);
+            // Selection uses exact names, never display-truncated labels whose
+            // synthetic suffix could match an otherwise unselected output.
+            if !terminal
+                && let Some(name) = name
+                && name
+                    .encode_utf16()
+                    .take(PRESENTATION_UTF16_LIMIT + 1)
+                    .count()
+                    <= PRESENTATION_UTF16_LIMIT
+                && self.connector_tools.len() < 1024
+            {
+                self.connector_tools.insert(id.into(), name.into());
+            }
+        }
         if self.platform == "cli" || update["sessionUpdate"] != "tool_call_update" {
             return None;
         }
-        let tool = update["title"]
-            .as_str()
-            .filter(|name| !name.is_empty())
-            .or_else(|| update["name"].as_str().filter(|name| !name.is_empty()))
-            .unwrap_or("unknown");
+        let remembered = call_id.and_then(|id| self.connector_tools.get(id)).cloned();
+        if terminal && let Some(id) = call_id {
+            self.connector_tools.remove(id);
+        }
+        let tool = name.or(remembered.as_deref()).unwrap_or("unknown");
         let identity = update["toolCallId"]
             .as_str()
             .filter(|id| !id.is_empty())
