@@ -37,3 +37,41 @@ jobs:
       run: |
         df -h . /tmp
         free -h
+
+  feature-matrix:
+    name: feature-matrix (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: feature-off-minimal
+          cargo_flags: --no-default-features
+        - name: a2a-minimal
+          cargo_flags: --no-default-features --features a2a
+        - name: a2a-minimal-agent-network
+          cargo_flags: --no-default-features --features a2a,agent-network
+        - name: a2a-default-agent-network
+          cargo_flags: --features a2a,agent-network
+    steps:
+    - uses: actions/checkout@v4
+    - name: Runner resources before compilation
+      run: |
+        df -h . /tmp
+        free -h
+    # Each row runs the complete self-contained suite; opt-in live providers
+    # and the separately supplied TypeScript reference remain excluded.
+    - name: Run feature qualification
+      env:
+        CARGO_TARGET_DIR: ${{ runner.temp }}/soulsteads-messaging-target
+      run: cargo test --locked ${{ matrix.cargo_flags }} --verbose
+    - name: Strict library Clippy
+      env:
+        CARGO_TARGET_DIR: ${{ runner.temp }}/soulsteads-messaging-target
+      run: cargo clippy --locked ${{ matrix.cargo_flags }} --lib -- -D warnings
+    - name: Runner resources after qualification
+      if: always()
+      run: |
+        df -h . /tmp
+        free -h
