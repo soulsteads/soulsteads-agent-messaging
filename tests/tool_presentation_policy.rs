@@ -19,6 +19,207 @@ fn call(id: &str, title: &str, input: Value) -> Value {
 }
 
 #[test]
+fn sparse_output_never_matches_a_synthetic_truncation_label() {
+    let mut presenter = OutputPresenter::new(
+        options("off", false, false, json!(["truncated"]), 20),
+        "telegram",
+    );
+    // A reused ID must also discard its earlier matching label when the new
+    // title is too large to remember exactly.
+    presenter.update(&call("long", "truncated", json!({})));
+    presenter.update(&call("long", &"x".repeat(500), json!({})));
+    assert!(
+        presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call_update","toolCallId":"long",
+                "status":"completed","rawOutput":{"output":"unselected output"}
+            }))
+            .is_none(),
+        "display truncation must not change output selection"
+    );
+}
+
+#[test]
+fn sparse_connector_output_requires_a_bounded_exact_call_id() {
+    for (id, accepted) in [
+        ("x".repeat(1024), true),
+        ("x".repeat(1025), false),
+        ("😀".repeat(256), true),
+        ("😀".repeat(257), false),
+    ] {
+        let mut presenter = OutputPresenter::new(
+            options("off", false, false, json!(["bash"]), 20),
+            "telegram",
+        );
+        presenter.update(&call(&id, "bash", json!({})));
+        let output = presenter.update(&json!({
+            "sessionUpdate":"tool_call_update","toolCallId":id,
+            "status":"completed","rawOutput":{"output":"synthetic result"}
+        }));
+        assert_eq!(output.is_some(), accepted, "UTF-8 ID bytes: {}", id.len());
+    }
+}
+
+#[test]
+fn terminal_initial_calls_never_leave_a_selectable_name() {
+    for status in ["completed", "failed"] {
+        let mut presenter = OutputPresenter::new(
+            options("off", false, false, json!(["bash"]), 20),
+            "telegram",
+        );
+        // A terminal initial call also retires any earlier use of its ID.
+        presenter.update(&call("one", "bash", json!({})));
+        let mut terminal = call("one", "bash", json!({}));
+        terminal["status"] = status.into();
+        presenter.update(&terminal);
+        assert!(
+            presenter
+                .update(&json!({
+                    "sessionUpdate":"tool_call_update","toolCallId":"one",
+                    "status":"completed","rawOutput":{"output":"late result must not inherit"}
+                }))
+                .is_none(),
+            "{status}"
+        );
+    }
+}
+
+#[test]
+fn sparse_in_progress_completion_and_failure_preserve_exact_selection() {
+    for status in ["in_progress", "completed", "failed"] {
+        let mut presenter = OutputPresenter::new(
+            options("off", false, false, json!(["bash"]), 20),
+            "telegram",
+        );
+        presenter.update(&call("one", "bash", json!({})));
+        let output = presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call_update","toolCallId":"one","status":status,
+                "rawOutput":{"output":"selected result","error":"selected failure"}
+            }))
+            .expect(status);
+        assert_eq!(output["toolPresentation"]["tool"], "bash");
+        assert_eq!(
+            output["text"],
+            if status == "failed" {
+                "[Error] selected failure"
+            } else {
+                "selected result"
+            }
+        );
+        if status == "in_progress" {
+            let terminal = presenter
+                .update(&json!({
+                    "sessionUpdate":"tool_call_update","toolCallId":"one","status":"completed",
+                    "rawOutput":{"output":"selected terminal result"}
+                }))
+                .unwrap();
+            assert_eq!(terminal["toolPresentation"]["tool"], "bash");
+        }
+        assert!(
+            presenter
+                .update(&json!({
+                    "sessionUpdate":"tool_call_update","toolCallId":"one","status":"completed",
+                    "rawOutput":{"output":"late unselected result"}
+                }))
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn sparse_connector_output_bounds_pending_names_and_reuses_completed_capacity() {
+    let mut presenter = OutputPresenter::new(
+        options("off", false, false, json!(["bash"]), 20),
+        "telegram",
+    );
+    for id in 0..1024 {
+        presenter.update(&call(&id.to_string(), "bash", json!({})));
+    }
+    presenter.update(&call("overflow", "bash", json!({})));
+    let completion = |id: &str, output: &str| {
+        json!({
+            "sessionUpdate":"tool_call_update","toolCallId":id,
+            "status":"completed","rawOutput":{"output":output}
+        })
+    };
+    assert!(
+        presenter
+            .update(&completion("overflow", "untracked"))
+            .is_none()
+    );
+    assert!(presenter.update(&completion("0", "tracked")).is_some());
+    presenter.update(&call("overflow", "bash", json!({})));
+    assert!(
+        presenter
+            .update(&completion("overflow", "new tracked output"))
+            .is_some()
+    );
+}
+
+#[test]
+fn sparse_connector_output_preserves_explicit_names_and_clears_finished_identity() {
+    let config = options("off", false, false, json!(["bash"]), 20);
+    let mut presenter = OutputPresenter::new(config.clone(), "telegram");
+    assert!(presenter.update(&call("one", "bash", json!({}))).is_none());
+    // An explicit completion name wins over the remembered start label.
+    assert!(
+        presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call_update","toolCallId":"one","title":"read",
+                "status":"completed","rawOutput":{"output":"not selected"}
+            }))
+            .is_none()
+    );
+    // Terminal updates discard the remembered identity, including filtered results.
+    assert!(
+        presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call_update","toolCallId":"one",
+                "status":"completed","rawOutput":{"output":"stale identity must not select this"}
+            }))
+            .is_none()
+    );
+    assert!(
+        presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call","toolCallId":"two","name":"bash"
+            }))
+            .is_none()
+    );
+    let output = presenter
+        .update(&json!({
+            "sessionUpdate":"tool_call_update","toolCallId":"two",
+            "status":"failed","rawOutput":{"error":"synthetic failure"}
+        }))
+        .unwrap();
+    assert_eq!(output["toolPresentation"]["tool"], "bash");
+    assert_eq!(output["text"], "[Error] synthetic failure");
+    assert!(
+        presenter
+            .update(&json!({
+                "sessionUpdate":"tool_call_update","toolCallId":"unseen",
+                "status":"completed","rawOutput":{"output":"unknown must not inherit another tool"}
+            }))
+            .is_none()
+    );
+
+    for platform in ["matrix", "web", "cli"] {
+        let mut presenter = OutputPresenter::new(config.clone(), platform);
+        presenter.update(&call("one", "bash", json!({})));
+        assert!(
+            presenter
+                .update(&json!({
+                    "sessionUpdate":"tool_call_update","toolCallId":"one",
+                    "status":"completed","rawOutput":{"output":"legacy behavior"}
+                }))
+                .is_none(),
+            "{platform}"
+        );
+    }
+}
+
+#[test]
 fn connector_presentation_is_targeted_and_preserves_literal_visible_arguments() {
     let input = json!({"command":"printf '@ ``` 😀'", "private":"only when visible"});
     for platform in ["telegram"] {

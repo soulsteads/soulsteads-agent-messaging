@@ -164,6 +164,185 @@ fn options(mode: &str, arguments: bool) -> Value {
     json!({"mode":mode,"showCalls":true,"showArguments":arguments,"showOutputFor":["*"],"maxTraceEntries":1})
 }
 
+/// Exercise the selected Copilot backend through real ACP subprocess I/O and the
+/// Bridge, not just a hand-built presenter event. Telegram stays on loopback;
+/// this proves integration/privacy policy, not live Copilot or Telegram service behavior.
+#[tokio::test]
+async fn copilot_acp_tools_reach_native_telegram_with_independent_privacy_gates() {
+    use soulsteads_messaging::{config, runtime::Bridge, store::Store};
+
+    const ARGUMENT: &str = "copilot-argument 😀 ``` <b>literal</b>";
+    const OUTPUT: &str = "copilot-output 😀 `@here` <b>literal</b>";
+    for mode in ["events", "trace", "status", "hermes"] {
+        for show_calls in [false, true] {
+            for show_arguments in [false, true] {
+                for show_output in [false, true] {
+                    let root = tempfile::tempdir().unwrap();
+                    let script = root.path().join("script.json");
+                    let audit = root.path().join("rpc.jsonl");
+                    std::fs::write(&script, json!([{
+                        "updates":[
+                            {"update":{"sessionUpdate":"tool_call","toolCallId":"copilot-shell","title":"bash","kind":"execute","status":"in_progress","rawInput":{"command":ARGUMENT}}},
+                            {"update":{"sessionUpdate":"tool_call_update","toolCallId":"copilot-shell","status":"completed","rawOutput":{"output":OUTPUT}}}
+                        ],
+                        "text":"copilot-final-answer", "stopReason":"end_turn"
+                    }]).to_string()).unwrap();
+                    let configuration = config::load(&json!({
+                        "rateLimitSeconds":0,
+                        "sessionStorePath":root.path().join("store.json"),
+                        "toolMessages":{
+                            "mode":mode,"showCalls":show_calls,"showArguments":show_arguments,
+                            "showOutputFor":if show_output { json!(["bash"]) } else { json!([]) }
+                        },
+                        "acp":{
+                            "defaultBackend":"copilot",
+                            "command":"/unselected-backend-must-not-launch",
+                            "backends":{"copilot":{
+                                "command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[],
+                                "env":{
+                                    "ACP_FIXTURE_MATRIX_SCRIPT":script,
+                                    "ACP_FIXTURE_MATRIX_COUNTER":root.path().join("counter"),
+                                    "ACP_FIXTURE_RPC_AUDIT":audit
+                                }
+                            }}
+                        }
+                    }).to_string(), &BTreeMap::new()).unwrap();
+                    let bridge =
+                        Bridge::new(configuration, BTreeMap::new(), root.path().join("sessions"))
+                            .unwrap();
+                    let (platform, event, fixture, server) = fixture().await;
+                    let context = bridge.context(&event);
+                    let sink = PlatformSink::new(platform, event.clone());
+                    tokio::time::timeout(
+                        std::time::Duration::from_secs(10),
+                        bridge.handle(event, &sink),
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap();
+                    bridge.shutdown().await.unwrap();
+                    assert!(
+                        Store::new(root.path().join("store.json"))
+                            .get("telegram", &context, "copilot")
+                            .unwrap()
+                            .is_some()
+                    );
+                    let calls: Vec<Value> = std::fs::read_to_string(&audit)
+                        .unwrap()
+                        .lines()
+                        .map(|line| serde_json::from_str(line).unwrap())
+                        .collect();
+                    assert_eq!(
+                        calls
+                            .iter()
+                            .filter(|call| call["method"] == "session/new")
+                            .count(),
+                        1
+                    );
+                    assert_eq!(
+                        calls
+                            .iter()
+                            .filter(|call| call["method"] == "session/prompt")
+                            .count(),
+                        1
+                    );
+
+                    let requests = fixture.lock().await;
+                    let bodies: Vec<_> = requests
+                        .iter()
+                        .filter(|(path, _)| {
+                            path.ends_with("/sendMessage") || path.ends_with("/editMessageText")
+                        })
+                        .map(|(_, body)| body)
+                        .collect();
+                    let final_reply: Vec<_> = bodies
+                        .iter()
+                        .filter(|body| body["text"] == "copilot-final-answer")
+                        .collect();
+                    assert_eq!(final_reply.len(), 1, "{mode}: {requests:?}");
+                    assert!(final_reply[0].get("entities").is_none());
+                    let activities: Vec<_> = requests
+                        .iter()
+                        .filter(|(_, body)| {
+                            body["entities"].as_array().is_some_and(|entities| {
+                                entities.iter().any(|entity| entity["type"] == "bold")
+                            }) && !body["text"].as_str().unwrap_or("").contains(OUTPUT)
+                        })
+                        .collect();
+                    assert_eq!(!activities.is_empty(), show_calls, "{mode}: {requests:?}");
+                    if show_calls {
+                        assert!(
+                            activities
+                                .iter()
+                                .any(|(path, _)| path.ends_with("/editMessageText")),
+                            "{mode}: {requests:?}"
+                        );
+                        // Status mode summarizes completion; other modes keep the tool's completed label.
+                        assert!(
+                            fixture
+                                .messages
+                                .lock()
+                                .await
+                                .values()
+                                .any(|body| body["text"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .to_ascii_lowercase()
+                                    .contains("completed")),
+                            "{mode}: {requests:?}"
+                        );
+                    }
+                    assert_eq!(
+                        bodies
+                            .iter()
+                            .any(|body| body["text"].as_str().unwrap().contains(ARGUMENT)),
+                        show_calls && show_arguments,
+                        "{mode}: {requests:?}"
+                    );
+                    let outputs: Vec<_> = bodies
+                        .iter()
+                        .filter(|body| body["text"].as_str().unwrap().contains(OUTPUT))
+                        .collect();
+                    assert_eq!(
+                        outputs.len(),
+                        usize::from(show_output),
+                        "{mode}: {requests:?}"
+                    );
+                    if show_output {
+                        assert!(
+                            outputs[0]["entities"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|entity| entity["type"] == "pre")
+                        );
+                    }
+                    for body in bodies {
+                        assert_eq!(body["chat_id"], "-123");
+                        // Edits address the existing message ID; only sends
+                        // carry Telegram's message_thread_id parameter.
+                        if body.get("message_id").is_none() {
+                            assert_eq!(body["message_thread_id"], 9);
+                        }
+                        assert!(body.get("parse_mode").is_none());
+                        let text: Vec<u16> =
+                            body["text"].as_str().unwrap().encode_utf16().collect();
+                        for entity in body["entities"].as_array().into_iter().flatten() {
+                            let start = entity["offset"].as_u64().unwrap() as usize;
+                            let end = start + entity["length"].as_u64().unwrap() as usize;
+                            assert!(end <= text.len());
+                            assert!(String::from_utf16(&text[start..end]).is_ok());
+                        }
+                    }
+                    drop(requests);
+                    server.abort();
+                    let _ = server.await;
+                }
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn telegram_tool_metadata_uses_native_entities_and_completion_edit() {
     let (platform, event, requests, server) = fixture().await;
