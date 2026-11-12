@@ -849,7 +849,7 @@ fn normalize_agent_homes(config: &mut Value, env: &BTreeMap<String, String>) -> 
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_default()
         .into();
-    for backend in ["opencode", "codex", "claude", "pi"] {
+    for backend in ["opencode", "codex", "claude", "pi", "copilot"] {
         let Some(settings) = config["acp"]["backends"][backend].as_object_mut() else {
             continue;
         };
@@ -2415,7 +2415,7 @@ impl Bridge {
         sink.emit(json!({"type":"response","text":text})).await
     }
     fn backend_config(&self, backend: &str) -> Result<&Value> {
-        if !["opencode", "codex", "claude", "pi"].contains(&backend) {
+        if !["opencode", "codex", "claude", "pi", "copilot"].contains(&backend) {
             bail!("Unknown or unconfigured backend");
         }
         if self.config["acp"]["backends"][backend].is_object() {

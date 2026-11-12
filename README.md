@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Your coding agent. Your chat app. Easy setup. No BS.</strong><br/>
-  Talk to Claude Code, Codex, OpenCode, or Pi from the messaging app you already use.
+  Talk to Claude Code, Codex, OpenCode, Pi, or GitHub Copilot from the messaging app you already use.
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ choose, using your own chat account and the agent you already have signed in.
 
 | | Supported |
 |---|---|
-| 🤖 **Agents** | Claude Code, OpenAI Codex, OpenCode, and Pi |
+| 🤖 **Agents** | Claude Code, OpenAI Codex, OpenCode, Pi, and GitHub Copilot CLI (native ACP) |
 | 💬 **Chat** | Telegram, Matrix, Mattermost, Slack, Discord, WhatsApp, and the built-in web interface |
 | 🔌 **Other agents** | Any compatible [Agent Client Protocol](https://agentclientprotocol.com) (ACP) server, via a custom command |
 
@@ -57,7 +57,7 @@ See [local agent tools](docs/AGENT-TOOLS.md) and [API qualification limits](docs
 ### The easy way: ask your agent
 
 Setting this up is a conversation, not a project. Open Claude Code, Codex,
-OpenCode, Pi, or any agent that can run commands, paste the prompt below, and
+OpenCode, Pi, GitHub Copilot, or any agent that can run commands, paste the prompt below, and
 answer its questions. Your agent builds the bridge, writes the configuration and
 installs the service; you only supply the bot token, in a private file.
 
@@ -116,6 +116,21 @@ files:
 
 See the [setup guide](docs/SETUP.md#how-manual-configuration-works) for backend
 overrides, validation, and migration behavior.
+
+### GitHub Copilot through ACP
+
+Install [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli)
+and run `copilot login` as the user running the bridge. Select it with:
+
+```json
+{"acp": {"defaultBackend": "copilot"}}
+```
+
+The bridge launches `copilot --acp --stdio` directly, using Copilot's native
+[ACP server](https://docs.github.com/en/copilot/reference/acp-server). No separate
+adapter package is needed. Setup is manual; see [Copilot configuration and
+live checks](docs/SETUP.md#github-copilot-cli-native-acp) for authentication,
+permissions, and qualification limits.
 
 ---
 
