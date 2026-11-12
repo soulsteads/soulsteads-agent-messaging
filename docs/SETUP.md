@@ -52,7 +52,7 @@ The first build downloads dependencies and can take a while.
   take precedence. [`.env.example`](../.env.example) lists every variable the
   bridge understands. Never commit real values.
 - **Choose an agent.** `acp.defaultBackend` selects the agent. Built-in backends
-  are `claude`, `codex` and `pi`; the default is `opencode`. For example,
+  are `claude`, `codex`, `pi` and `copilot`; the default is `opencode`. For example,
   `{"acp": {"defaultBackend": "claude"}}`.
 - **Use an existing agent home (optional).** Set `acp.agentHome` to an absolute
   directory or `~/…` path to run new ACP and native sessions in that exact
@@ -98,6 +98,94 @@ Requests start with the `trigger` prefix (`!oc` by default; set `"trigger"` in t
 configuration to change it). Each connector's section says when it answers without one.
 
 ---
+
+## GitHub Copilot CLI (native ACP)
+
+Copilot uses its own [ACP server](https://docs.github.com/en/copilot/reference/acp-server),
+not one of this project's bundled native-protocol adapters. Install Copilot CLI
+on the bridge host, make `copilot` available on the service user's `PATH`, and run
+`copilot login` as that user with an account entitled to Copilot. GitHub CLI
+authentication alone does not establish Copilot entitlement.
+
+Select the backend in your configuration:
+
+```json
+{
+  "acp": {
+    "defaultBackend": "copilot",
+    "agentHome": "~/agents/helper"
+  }
+}
+```
+
+`agentHome` is optional and must already exist. Without it, the bridge uses its
+normal per-conversation workspace. The default launch command is
+`copilot --acp --stdio`. An existing conversation can switch with
+`/backend copilot`; its saved Copilot binding is independent of other backends
+and resumes after a bridge restart once Copilot has persisted the conversation.
+The tested Copilot CLI does not retain a session created only by control queries
+before its first prompt. Before using separate one-shot CLI invocations for model
+controls, send a text prompt once; if an empty session was lost after exit, use
+`/clear` to forget its stale bridge binding. Long-lived conversations can query
+and switch models within the same process normally.
+Command, argument, environment and home
+overrides use `acp.backends.copilot`, for example:
+
+```json
+{
+  "acp": {
+    "defaultBackend": "copilot",
+    "backends": {
+      "copilot": {
+        "command": "/opt/copilot/bin/copilot",
+        "args": ["--acp", "--stdio"],
+        "env": {
+          "COPILOT_HOME": "/srv/copilot",
+          "COPILOT_GITHUB_TOKEN": "{env:COPILOT_GITHUB_TOKEN}"
+        }
+      }
+    }
+  }
+}
+```
+
+The environment override is optional: normal `copilot login` uses the native
+credential store. For headless authentication, keep the token in a private
+environment file, not JSON or chat. Copilot backend processes receive the same
+restricted ambient environment as the other non-OpenCode backends; custom
+`COPILOT_HOME`, token, model or provider variables must be explicitly passed in
+`acp.backends.copilot.env`. The bridge does not perform a login flow or add
+`--allow-all`, `--allow-all-tools`, or other permission-bypass flags.
+The existing connector approval rules apply; without a supported interactive
+approval route, ACP permission requests are cancelled, not implicitly granted.
+
+Copilot's ACP support is a public preview. Use `/models` to inspect the session's
+advertised choices and `/model <model-id>` to select one, or use
+`/config model <model-id>`. The bridge uses ACP `session/set_config_option` and requires the
+returned configuration to confirm the selected model. `/model` queries the
+current selection. Model, mode, session and MCP features depend on the installed
+CLI and what it advertises; not every native slash
+command is available through ACP. Guided Telegram setup and the optional local
+agent-tools harness remain limited to their documented backends. Adding Copilot
+does not qualify unattended shell execution, cancellation cleanup, or every live
+connector combination.
+
+For a real inference and restart/resume check through the compiled messaging
+CLI, explicitly opt into a saved native login:
+
+```sh
+COPILOT_LIVE_HOME="$HOME/.copilot" cargo test --locked --test live_copilot -- --ignored --nocapture
+```
+
+Alternatively, supply `COPILOT_GITHUB_TOKEN` securely in the environment; the
+test then uses a fresh Copilot home unless `COPILOT_LIVE_HOME` is also set.
+The test sends only synthetic text, checks an exact reply, then restarts the
+bridge and verifies the same session recalls a random test word. It starts no
+chat connectors and grants no blanket tool permissions. A supplied native home
+retains these synthetic test sessions; failures retain private diagnostic state
+outside the checkout. Live inference needs network access and may consume
+Copilot credits. Self-contained fixture tests run without credentials as part
+of `cargo test --locked`.
 
 ## Telegram
 

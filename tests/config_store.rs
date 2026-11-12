@@ -217,6 +217,10 @@ fn all_source_configuration_oracles_match_without_panics() {
         // every legacy field to the unchanged source-generated oracle.
         if let Some(acp) = actual["acp"].as_object_mut() {
             assert_eq!(acp.remove("agentHome"), Some(json!("")));
+            assert_eq!(
+                acp["backends"].as_object_mut().unwrap().remove("copilot"),
+                Some(json!({"command":"copilot","args":["--acp","--stdio"]}))
+            );
         }
         if let Some(matrix) = actual["matrix"].as_object_mut() {
             assert_eq!(

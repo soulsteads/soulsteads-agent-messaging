@@ -53,7 +53,7 @@ fn rpc(path: &Path) -> Vec<Value> {
 
 #[tokio::test]
 async fn configured_agent_home_is_canonical_cwd_for_every_backend_and_override_wins() {
-    for backend in ["opencode", "codex", "claude", "pi"] {
+    for backend in ["opencode", "codex", "claude", "pi", "copilot"] {
         let root = tempfile::tempdir().unwrap();
         let inherited = home(root.path(), "inherited");
         let override_home = home(root.path(), "override");
