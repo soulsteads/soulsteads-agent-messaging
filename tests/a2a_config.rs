@@ -141,10 +141,14 @@ fn raw_bridge_rejects_enabled_a2a_when_feature_is_off() {
 fn backend_resolution_matches_runtime_supported_names_and_defaults() {
     let mut value = config::defaults();
     value["a2a"] = json!({"version":1,"enabled":true,"peers":[{"id":"p","verifierPath":"/absent"}],"agents":[{"id":"a","backend":"codex","allowedPeers":["p"]}]});
-    assert!(
-        load(value.clone()).is_ok(),
-        "embedded codex backend must resolve"
-    );
+    for backend in ["opencode", "codex", "claude", "pi", "copilot"] {
+        value["a2a"]["agents"][0]["backend"] = backend.into();
+        let result = load(value.clone());
+        assert!(
+            result.is_ok(),
+            "embedded {backend} backend must resolve: {result:?}"
+        );
+    }
     value["a2a"]["agents"][0]["backend"] = "custom".into();
     value["acp"]["backends"]["custom"] = json!({"command":"fake"});
     assert!(
@@ -188,6 +192,17 @@ fn feature_on_accepts_enabled_inert_configuration() {
 #[cfg(all(feature = "a2a", unix))]
 #[test]
 fn cli_check_config_succeeds_but_ordinary_startup_refuses_before_side_effects() {
+    assert_cli_a2a_refusal("opencode");
+}
+
+#[cfg(all(feature = "a2a", unix))]
+#[test]
+fn copilot_config_validates_but_prompt_and_serve_refuse_before_launch() {
+    assert_cli_a2a_refusal("copilot");
+}
+
+#[cfg(all(feature = "a2a", unix))]
+fn assert_cli_a2a_refusal(backend_name: &str) {
     let root = tempfile::tempdir().unwrap();
     let home = root.path().join("home");
     let cwd = root.path().join("cwd");
@@ -205,7 +220,11 @@ fn cli_check_config_succeeds_but_ordinary_startup_refuses_before_side_effects() 
     value["web"]["enabled"] = true.into();
     value["web"]["host"] = "127.0.0.1".into();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    value["web"]["port"] = listener.local_addr().unwrap().port().into();
+    let address = listener.local_addr().unwrap();
+    value["web"]["port"] = address.port().into();
+    // Leave the configured port available: a missing serve guard must not be
+    // masked by an unrelated address-in-use failure.
+    drop(listener);
     let marker = root.path().join("backend.marker");
     let backend = root.path().join("fake-backend");
     std::fs::write(
@@ -220,8 +239,16 @@ exit 0
     std::fs::set_permissions(&backend, std::fs::Permissions::from_mode(0o700)).unwrap();
     value["acp"]["command"] = backend.to_string_lossy().to_string().into();
     value["acp"]["args"] = json!([]);
+    value["acp"]["env"] = json!({"BACKEND_MARKER":marker});
+    value["acp"]["defaultBackend"] = backend_name.into();
+    if backend_name != "opencode" {
+        value["acp"]["backends"][backend_name] = json!({
+            "command":backend,"args":[],"env":{"BACKEND_MARKER":marker}
+        });
+    }
     std::fs::write(&config_path, {
         value["a2a"] = valid(&verifier)["a2a"].clone();
+        value["a2a"]["agents"][0]["backend"] = backend_name.into();
         value.to_string()
     })
     .unwrap();
@@ -257,17 +284,26 @@ exit 0
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
     };
-    let (check, _) = run(&["--check-config"]);
-    assert!(check.success());
-    let (ordinary, _) = run(&["--no-images", "probe"]);
-    assert!(!ordinary.success());
+    let (check, output) = run(&["--check-config"]);
+    assert!(check.success(), "{backend_name}: {output:?}");
     assert!(
-        !marker.exists(),
-        "enabled A2A must refuse before starting ACP"
+        String::from_utf8_lossy(&output.stdout)
+            .contains("Configuration loaded successfully; no connectors started.")
     );
-    assert!(!root.path().join("missing/session.json").exists());
-    assert!(!verifier.exists());
-    assert!(listener.local_addr().is_ok());
+    for args in [vec!["--no-images", "probe"], vec!["--no-images", "--serve"]] {
+        let (ordinary, output) = run(&args);
+        assert!(!ordinary.success(), "{backend_name} {args:?}: {output:?}");
+        assert!(
+            !marker.exists(),
+            "enabled A2A must refuse before starting {backend_name}"
+        );
+        assert!(!root.path().join("missing/session.json").exists());
+        assert!(!root.path().join("sessions").exists());
+        assert!(!verifier.exists());
+        let rebound = std::net::TcpListener::bind(address)
+            .expect("refused serve must leave its configured loopback port available");
+        drop(rebound);
+    }
     let mut disabled: Value =
         serde_json::from_slice(&std::fs::read(&config_path).unwrap()).unwrap();
     disabled.as_object_mut().unwrap().remove("a2a");

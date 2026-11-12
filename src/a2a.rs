@@ -122,7 +122,7 @@ pub(crate) fn validate(value: &Value) -> Result<()> {
             None if enabled => bail!("a2a agent backend is required"),
             None => "",
         };
-        let supported_backend = ["opencode", "codex", "claude", "pi"].contains(&backend);
+        let supported_backend = ["opencode", "codex", "claude", "pi", "copilot"].contains(&backend);
         let configured =
             backends.is_some_and(|items| items.get(backend).is_some_and(Value::is_object));
         if enabled && !supported_backend {

@@ -39,6 +39,7 @@ Regress actual backend prompt capture with spoofed identity/delimiter text, slas
 Unicode, maximum-size control-heavy text, and unchanged human prompts. Document the
 public behavior and limits. Fixture qualification is not live model or production
 acceptance. No private incident evidence belongs in the public tree.
+
 ---
 
 # A2A integration plan
@@ -199,4 +200,3 @@ receipts outside disposable build output. Run feature-off, `a2a`, and combined
 Remove only inactive regenerable task-owned outputs after final verification and
 fresh process/open-file/reference checks. Preserve source, credentials, unique
 evidence, deployed binaries, and rollback artifacts.
-

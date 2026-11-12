@@ -31,6 +31,12 @@ authentication, an execution capability, or a server authorization hook. No
 transport, storage, listener, token, or execution settings are implemented by
 this checkpoint.
 
+Supported configured backend identities are `opencode`, `codex`, `claude`, `pi`
+and `copilot`. Copilot uses its existing native ACP backend configuration;
+validation does not launch it or establish CLI availability, login or entitlement.
+Unknown/custom runtime identities remain rejected. These are configuration
+compatibility checks, not permission to execute an A2A request.
+
 ### Checkpoint 1a verification
 
 Run from the repository root:
@@ -41,11 +47,27 @@ cargo test --locked --no-default-features --test a2a_config
 cargo test --locked --no-default-features --features a2a --lib a2a::policy_tests
 ```
 
-The retained final feature-on/off and policy logs record **15 passed** for the
+The historical focused feature-on/off and policy logs record **15 passed** for the
 feature-on configuration tests, **11 passed** for the feature-off configuration
-tests, and **4 passed** for the private policy tests. These are focused checks;
-broader feature-matrix validation and final independent review are not claimed
-here. The exact-candidate delivery receipt tracks release qualification.
+tests, and **4 passed** for the private policy tests. These are earlier focused
+results, not counts for the current tree.
+
+Current CI retains the default A2A-off suite and adds full locked suites for the
+following independent/combined feature sets. Set `CARGO_TARGET_DIR` to an external
+build directory before reproducing them locally:
+
+```sh
+cargo test --locked --no-default-features
+cargo test --locked --no-default-features --features a2a
+cargo test --locked --no-default-features --features a2a,agent-network
+cargo test --locked --features a2a,agent-network
+```
+
+Every row runs the complete self-contained suite; A2A-on rows include the config,
+private policy and SDK loopback targets. Strict library Clippy uses each row's
+same feature flags. Opt-in live providers and the separately supplied reference
+conformance remain excluded. The exact-head PR checks and delivery receipt track
+current results; neither CI nor configuration admission activates an A2A runtime.
 
 ### Plan checkpoint
 
