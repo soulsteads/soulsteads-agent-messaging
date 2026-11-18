@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Your coding agent. Your chat app. Easy setup. No BS.</strong><br/>
+  <strong>Talk to your coding agent from your chat app.</strong><br/>
   Talk to Claude Code, Codex, OpenCode, Pi, or GitHub Copilot from the messaging app you already use.
 </p>
 
@@ -20,6 +20,8 @@
 
 The bridge runs on your machine and connects your messages to the agent you
 choose, using your own chat account and the agent you already have signed in.
+For a first setup, use Telegram with Claude Code or Codex on Linux. You need Git,
+Rust/Cargo, Python 3.11+, a systemd user session, and a dedicated Telegram bot.
 
 <p align="center">
   <img src="assets/diagram.svg" alt="A chat app and a coding agent exchange messages through soulsteads-messaging, which runs on your machine" />
@@ -64,8 +66,8 @@ installs the service; you only supply the bot token, in a private file.
 ```text
 Set up Soulsteads Agent Messaging so I can talk to you from my chat app.
 
-1. Clone https://github.com/soulsteads/soulsteads-agent-messaging (branch
-   `release`) unless you are already inside it.
+1. Clone the main branch of the public Soulsteads Agent Messaging repository
+   I shared, unless you are already inside that checkout.
 2. Read README.md and docs/SETUP.md, and use the setup-soulsteads-messaging
    skill if you have it.
 3. Ask me which chat app to use (Telegram has a guided setup) and which agent
@@ -97,6 +99,11 @@ Setup for every platform is in the **[setup guide](docs/SETUP.md)**.
 
 Credentials go in an environment file; [`.env.example`](.env.example) lists every
 variable the bridge reads.
+
+**Upgrading?** Before restarting an enabled remote connector, set `allowedUsers`
+to the platform IDs you want to admit. An empty list now fails configuration
+validation unless you explicitly enable `allowAllUsers`. See the
+[setup guide](docs/SETUP.md#how-manual-configuration-works).
 
 ### Use a preconfigured agent directory
 

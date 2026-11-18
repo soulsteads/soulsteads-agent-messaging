@@ -94,6 +94,65 @@ pub(super) fn approval_policy(mode: &str) -> &'static str {
         "on-request"
     }
 }
+// The Matrix broker accepts a deliberately small literal-command shape. Native
+// routing IDs and optional persistent-policy suggestions are not command input;
+// this adapter only ever returns a one-command decision, never those suggestions.
+pub(super) fn approval_input(params: &Value) -> Value {
+    let Some(fields) = params.as_object() else {
+        return params.clone();
+    };
+    if fields.keys().any(|key| {
+        ![
+            "threadId",
+            "turnId",
+            "itemId",
+            "approvalId",
+            "startedAtMs",
+            "command",
+            "cwd",
+            "reason",
+            "commandActions",
+            "availableDecisions",
+            "proposedExecpolicyAmendment",
+            "proposedNetworkPolicyAmendments",
+            "kind",
+            "environmentId",
+            "networkApprovalContext",
+        ]
+        .contains(&key.as_str())
+    }) || params.get("kind").is_some_and(|kind| kind != "command")
+        || (!params["environmentId"].is_null() && params["environmentId"] != "local")
+        || !params["networkApprovalContext"].is_null()
+    {
+        return params.clone();
+    }
+    let mut input = json!({"command":params["command"], "cwd":params["cwd"]});
+    if let Some(reason) = params["reason"].as_str() {
+        input["description"] = json!(reason);
+    }
+    input
+}
+
+#[test]
+fn native_approval_normalizes_only_literal_commands() {
+    let request = json!({"threadId":"t", "turnId":"u", "itemId":"i", "command":"printf harmless", "cwd":"/workspace", "reason":"one command", "proposedExecpolicyAmendment":["printf"], "kind":"command", "environmentId":"local"});
+    assert_eq!(
+        approval_input(&request),
+        json!({"command":"printf harmless", "cwd":"/workspace", "description":"one command"})
+    );
+    for field in [
+        "additionalPermissions",
+        "environmentId",
+        "networkApprovalContext",
+    ] {
+        let mut scoped = request.clone();
+        scoped[field] = json!({"unexpected":true});
+        assert_eq!(approval_input(&scoped), scoped);
+    }
+    let mut stdin = request;
+    stdin["kind"] = json!("writeStdin");
+    assert_eq!(approval_input(&stdin), stdin);
+}
 pub(super) fn sandbox(mode: &str, cwd: &Path) -> Value {
     match mode {
         "read-only" => json!({"type":"readOnly","networkAccess":false}),

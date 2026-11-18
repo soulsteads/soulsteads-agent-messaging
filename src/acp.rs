@@ -203,6 +203,20 @@ fn replace_config_options(state: &mut State, options: Vec<Value>) {
     state.config_options = options;
 }
 
+// Only the built-in single-run backend uses this ephemeral transport FIFO.
+#[derive(Default)]
+struct SerialFollowups {
+    enabled: bool,
+    accepting: bool,
+    pending: VecDeque<String>,
+}
+impl SerialFollowups {
+    fn discard(&mut self) {
+        self.accepting = false;
+        self.pending.clear();
+    }
+}
+
 struct Inner {
     stdin: Arc<Mutex<Option<ChildStdin>>>,
     connection: std::sync::OnceLock<ConnectionTo<Agent>>,
@@ -216,6 +230,7 @@ struct Inner {
     closed_reason: std::sync::Mutex<Option<String>>,
     active: AtomicBool,
     followups: AtomicUsize,
+    serial_followups: std::sync::Mutex<SerialFollowups>,
     state: Mutex<State>,
     events: broadcast::Sender<Value>,
     options: Options,
@@ -484,6 +499,7 @@ impl Client {
             closed_reason: Default::default(),
             active: AtomicBool::new(false),
             followups: AtomicUsize::new(0),
+            serial_followups: Default::default(),
             state: Mutex::new(State::default()),
             events,
             options,
@@ -693,6 +709,13 @@ impl Client {
     pub fn accepts_followups(&self) -> bool {
         self.inner.active.load(Ordering::SeqCst)
     }
+    /// Enable before admitting prompts; generic ACP keeps concurrent steering.
+    pub fn enable_serial_followups(&self) {
+        self.inner.serial_followups.lock().unwrap().enabled = true;
+    }
+    pub fn queues_followups(&self) -> bool {
+        self.inner.serial_followups.lock().unwrap().enabled
+    }
     pub async fn session_id(&self) -> Option<String> {
         self.inner.state.lock().await.session.clone()
     }
@@ -820,9 +843,17 @@ impl Client {
             .get()
             .context("ACP SDK connection unavailable")?;
         let mut stopped = self.inner.stop.subscribe();
-        let response = connection
-            .send_request(protocol_request(method, params)?)
-            .block_task();
+        let response = {
+            // Admission and cancellation share this lock. Once handed to the
+            // SDK a prompt has unknown effects and is never retried.
+            let queue = self.inner.serial_followups.lock().unwrap();
+            if method == "session/prompt" && queue.enabled && !queue.accepting {
+                bail!("ACP queued work discarded; prompt was not submitted");
+            }
+            connection
+                .send_request(protocol_request(method, params)?)
+                .block_task()
+        };
         let operation = async {
             tokio::select! {
                 result = response => result.map_err(|error| {
@@ -848,11 +879,13 @@ impl Client {
         struct ActiveGuard(Arc<Inner>);
         impl Drop for ActiveGuard {
             fn drop(&mut self) {
-                self.0.active.store(false, Ordering::SeqCst);
+                self.0.serial_followups.lock().unwrap().discard();
                 self.0.permissions.lock().unwrap().clear();
+                self.0.active.store(false, Ordering::SeqCst);
             }
         }
         let _guard = ActiveGuard(self.inner.clone());
+        self.inner.serial_followups.lock().unwrap().accepting = true;
         {
             let mut state = self.inner.state.lock().await;
             state.stop_reason = None;
@@ -867,12 +900,43 @@ impl Client {
         let session = self.session_id().await.unwrap();
         let mut content = vec![json!({"type":"text","text":text})];
         content.extend(images);
-        let result = self
+        let mut result = self
             .request(
                 "session/prompt",
                 json!({"sessionId":session,"prompt":content}),
             )
             .await;
+        if self.queues_followups() {
+            loop {
+                if let Some(error) = self.inner.state.lock().await.collector_error.clone() {
+                    result = Err(anyhow::anyhow!(error));
+                }
+                let next = {
+                    let mut queue = self.inner.serial_followups.lock().unwrap();
+                    if !queue.accepting
+                        || !matches!(&result, Ok(value) if value["stopReason"] == "end_turn")
+                        || self.inner.closed.load(Ordering::SeqCst)
+                    {
+                        queue.discard();
+                        None
+                    } else {
+                        let next = queue.pending.pop_front();
+                        if next.is_none() {
+                            queue.accepting = false;
+                        }
+                        next
+                    }
+                };
+                let Some(text) = next else { break };
+                self.inner.state.lock().await.text_boundary_pending = true;
+                result = self
+                    .request(
+                        "session/prompt",
+                        json!({"sessionId":session,"prompt":[{"type":"text","text":text}]}),
+                    )
+                    .await;
+            }
+        }
         if self.inner.followups.load(Ordering::SeqCst) == 0 || result.is_err() {
             self.inner.permissions.lock().unwrap().clear();
         }
@@ -895,7 +959,9 @@ impl Client {
         loop {
             let state = self.inner.state.lock().await;
             if self.inner.followups.load(Ordering::SeqCst) == 0 {
-                self.inner.active.store(false, Ordering::SeqCst);
+                if !self.queues_followups() {
+                    self.inner.active.store(false, Ordering::SeqCst);
+                }
                 break;
             }
             drop(state);
@@ -914,6 +980,22 @@ impl Client {
         })
     }
     pub async fn forward(&self, text: &str) -> Result<()> {
+        {
+            let mut queue = self.inner.serial_followups.lock().unwrap();
+            if queue.enabled {
+                if !queue.accepting
+                    || !self.inner.active.load(Ordering::SeqCst)
+                    || self.inner.closed.load(Ordering::SeqCst)
+                {
+                    bail!("No active ACP prompt accepting queued work");
+                }
+                if queue.pending.len() >= 8 {
+                    bail!("ACP follow-up queue full");
+                }
+                queue.pending.push_back(text.into());
+                return Ok(());
+            }
+        }
         let state = self.inner.state.lock().await;
         if !self.accepts_followups() {
             bail!("No active ACP prompt");
@@ -947,6 +1029,7 @@ impl Client {
         Ok(())
     }
     pub async fn cancel(&self) -> Result<()> {
+        self.inner.serial_followups.lock().unwrap().discard();
         let _gate = self.inner.cancel_gate.lock().await;
         self.inner.permissions.lock().unwrap().clear();
         if self.inner.closed.load(Ordering::SeqCst) {
@@ -1152,6 +1235,7 @@ fn choice_contains(options: &Value, value: &str) -> bool {
 
 impl Inner {
     async fn close(&self, message: &str) {
+        self.serial_followups.lock().unwrap().discard();
         if !self.closed.swap(true, Ordering::SeqCst) {
             *self.closed_reason.lock().unwrap() = Some(message.into());
         }

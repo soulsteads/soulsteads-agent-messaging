@@ -3,8 +3,8 @@ use axum::{
     extract::{Request, State},
     routing::any,
 };
-use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use serde_json::{Value, json};
+use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use std::{
     collections::BTreeMap,
     future::IntoFuture,

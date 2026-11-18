@@ -1,11 +1,11 @@
 use async_trait::async_trait;
+use futures_util::{SinkExt, StreamExt};
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
     web,
 };
-use futures_util::{SinkExt, StreamExt};
-use serde_json::{Value, json};
 use std::{collections::BTreeMap, future::IntoFuture, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 

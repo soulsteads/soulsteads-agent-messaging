@@ -3,6 +3,9 @@ use crate::config;
 #[cfg(feature = "agent-network")]
 use crate::delivery::{AgentId, DirectRefusal, DirectRequest, LocalClient};
 
+#[path = "../tests/support/acp_fixture_path.rs"]
+mod fixture_path;
+
 #[test]
 fn retention_policy_parser_matches_executed_pinned_source() {
     let oracle: Value =
@@ -197,17 +200,7 @@ fn fixture() -> (tempfile::TempDir, Bridge) {
         .prefix("expiry-private-")
         .tempdir()
         .unwrap();
-    let executable = std::env::current_exe().unwrap();
-    let command = executable
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("acp-fixture");
-    assert!(
-        command.is_file(),
-        "build the offline acp-fixture binary before library tests"
-    );
+    let command = fixture_path::acp_fixture();
     let configuration = config::load(
         &json!({"rateLimitSeconds":0,"sessionStorePath":directory.path().join("store.json"),"sessionPicker":{"enabled":true},"acp":{"command":command,"args":[],"env":{"ACP_FIXTURE_MATRIX_AUDIT":directory.path().join("audit.jsonl")}}}).to_string(),
         &BTreeMap::new(),
@@ -314,14 +307,7 @@ fn direct_fixture() -> (tempfile::TempDir, Arc<Bridge>, DirectRecorder, PathBuf)
         .to_string(),
     )
     .unwrap();
-    let executable = std::env::current_exe().unwrap();
-    let command = executable
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("acp-fixture");
-    assert!(command.is_file());
+    let command = fixture_path::acp_fixture();
     let configuration = config::load(
         &json!({
             "rateLimitSeconds":0,

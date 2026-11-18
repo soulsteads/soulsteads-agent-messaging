@@ -264,13 +264,12 @@ async fn socket_conversation(mut socket: WebSocket, fixture: WireReplayFixture) 
             ))
             .await
             .unwrap();
-    } else if kind == "mattermost" {
-        if let Some(Ok(message)) = socket.next().await
-            && let Ok(text) = message.to_text()
-            && let Ok(value) = serde_json::from_str(text)
-        {
-            fixture.record_socket(value).await;
-        }
+    } else if kind == "mattermost"
+        && let Some(Ok(message)) = socket.next().await
+        && let Ok(text) = message.to_text()
+        && let Ok(value) = serde_json::from_str(text)
+    {
+        fixture.record_socket(value).await;
     }
 
     fixture.socket_connected.store(true, Ordering::SeqCst);
@@ -544,6 +543,21 @@ async fn wait_for_file(path: &Path, name: &str) -> Result<()> {
     })
     .await
     .with_context(|| format!("timed out waiting for {name}"))
+}
+
+async fn wait_for_audit_method(path: &Path, method: &str) -> Result<()> {
+    timeout(Duration::from_secs(5), async {
+        loop {
+            if rpc_audit(path, true)
+                .is_ok_and(|rows| rows.iter().any(|row| row["method"] == method))
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .with_context(|| format!("timed out waiting for ACP {method} in audit"))
 }
 
 struct RunningReplay {
@@ -1020,11 +1034,9 @@ async fn held_turn_cancellation(case: &ProtocolCase) -> Result<()> {
                     .await?;
             }
         }
-        wait_for_file(
-            &root.path().join("rpc-audit.jsonl"),
-            "ACP cancellation audit",
-        )
-        .await?;
+        // The audit file exists from the first RPC; wait for the cancel itself
+        // rather than the file, since the acknowledgement precedes forwarding.
+        wait_for_audit_method(&root.path().join("rpc-audit.jsonl"), "session/cancel").await?;
         let methods = rpc_audit(&root.path().join("rpc-audit.jsonl"), false)?;
         ensure!(
             methods

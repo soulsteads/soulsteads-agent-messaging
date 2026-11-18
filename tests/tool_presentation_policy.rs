@@ -222,7 +222,8 @@ fn sparse_connector_output_preserves_explicit_names_and_clears_finished_identity
 #[test]
 fn connector_presentation_is_targeted_and_preserves_literal_visible_arguments() {
     let input = json!({"command":"printf '@ ``` 😀'", "private":"only when visible"});
-    for platform in ["telegram"] {
+    {
+        let platform = "telegram";
         let mut presenter = TurnPresenter::new(
             options("events", true, true, json!([]), 20),
             platform,

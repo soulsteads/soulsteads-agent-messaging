@@ -7,9 +7,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{any, get},
 };
-use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
+use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use std::{
     collections::BTreeMap,
     future::IntoFuture,

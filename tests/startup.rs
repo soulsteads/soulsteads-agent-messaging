@@ -1,5 +1,5 @@
-use soulsteads_messaging::config;
 use serde_json::json;
+use soulsteads_messaging::config;
 use std::{collections::BTreeMap, process::Command};
 
 #[test]

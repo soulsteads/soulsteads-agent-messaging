@@ -18,8 +18,10 @@ reach the messaging server and the services used by your harness.
   on the build filesystem before building. A source build downloads dependencies.
 - Use a dedicated bot account. Check your existing services and applications for
   another bridge using that account. Do not activate a competing consumer.
-- Choose exactly which users and rooms/channels may reach the agent. An empty
-  sender allowlist can allow everyone. Do not rely on a trigger as authorization.
+- Set `allowedUsers` to the platform user IDs that may reach the agent and
+  restrict rooms/channels as appropriate. An enabled connector with an empty
+  sender allowlist is rejected unless you explicitly opt in with `allowAllUsers`.
+  Do not rely on a trigger as authorization.
 - Review the harness's tools and permissions. The bridge is not a sandbox, and a
   conversation working directory does not restrict access to other files.
 

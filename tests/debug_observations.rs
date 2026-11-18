@@ -1,5 +1,5 @@
-use soulsteads_messaging::debug_log::DebugLogger;
 use serde_json::json;
+use soulsteads_messaging::debug_log::DebugLogger;
 
 #[test]
 fn source_optional_debug_append_is_private_bounded_and_never_logs_payloads() {

@@ -2,7 +2,7 @@
 name = "soulsteads-agent-messaging"
 version = "0.2.0"
 edition = "2024"
-authors = ["Scott Glover <scottgl@gmail.com>"]
+authors = ["Scott Glover"]
 license = "Apache-2.0"
 description = "Native ACP chat bridge"
 default-run = "soulsteads-messaging"

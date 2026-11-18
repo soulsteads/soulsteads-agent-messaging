@@ -596,11 +596,16 @@ fn cli_single_prompt_reopens_existing_web_identity_without_migrating_store_or_cw
     );
     let session = root.path().join("sessions/web/cli");
     std::fs::create_dir_all(&session).unwrap();
-    let mut config: Value =
-        serde_json::from_slice(&std::fs::read(root.path().join("soulsteads-messaging.json")).unwrap())
-            .unwrap();
+    let mut config: Value = serde_json::from_slice(
+        &std::fs::read(root.path().join("soulsteads-messaging.json")).unwrap(),
+    )
+    .unwrap();
     config["acp"]["backendId"] = "synthetic-cli-backend".into();
-    std::fs::write(root.path().join("soulsteads-messaging.json"), config.to_string()).unwrap();
+    std::fs::write(
+        root.path().join("soulsteads-messaging.json"),
+        config.to_string(),
+    )
+    .unwrap();
     let store = Store::new(root.path().join("store.json"));
     let entry = Entry {
         connector: "web".into(),

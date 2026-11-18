@@ -89,15 +89,74 @@ The first build downloads dependencies and can take a while.
   For all command-line options, run `./target/release/soulsteads-messaging --help`.
 
 > [!WARNING]
-> **An empty `allowedUsers` list allows everyone who can reach the bot.** Always
-> set it to your own user ID on every connector you enable. The environment
-> variable `<PLATFORM>_ALLOWED_USERS` (for example `SLACK_ALLOWED_USERS`, a
-> comma-separated list) overrides the configuration file when it is not empty.
+> **Enabled remote connectors require an explicit access policy.** Set
+> `allowedUsers` to your own user ID. An empty list is rejected at startup and by
+> `--check-config`, unless you deliberately set `allowAllUsers: true`. That opt-in
+> admits everyone who can reach the bot; it does not disable ignore lists. The
+> environment variable `<PLATFORM>_ALLOWED_USERS` (for example
+> `SLACK_ALLOWED_USERS`, a comma-separated list) overrides the configuration file
+> when it is not empty. For an existing installation, update the allowlist and
+> run `--check-config` before restarting.
 
 Requests start with the `trigger` prefix (`!oc` by default; set `"trigger"` in the
 configuration to change it). Each connector's section says when it answers without one.
 
 ---
+
+## Soulsteads native harness (opt-in ACP)
+
+The optional Rust harness can run as the explicit `soulsteads` backend. It is a
+separately installed executable, not a bundled adapter or an alias for OpenCode.
+The default backend remains `opencode`; selecting `soulsteads` requires an
+explicit command and arguments:
+
+```json
+{
+  "acp": {
+    "defaultBackend": "soulsteads",
+    "backends": {
+      "soulsteads": {
+        "command": "/opt/soulsteads/bin/soulsteads-harness",
+        "args": ["--config", "/srv/agent/harness.toml", "--home", "/srv/agent/state", "acp"],
+        "agentHome": "/srv/agent/workspace",
+        "env": {"HARNESS_BASE_URL": "{env:HARNESS_BASE_URL}"}
+      }
+    }
+  }
+}
+```
+
+Prepare the harness configuration separately: select its model, instructions,
+skills, MCP servers and tool grants there. The existing `agentHome` directory
+must match the harness's granted workspace; the harness refuses a different ACP
+cwd. This directory setting does not generate harness configuration or imply
+Agent Home's automatic configuration translation supports the native harness.
+Without a matching workspace configuration, per-conversation workspace creation
+alone is not sufficient for this harness.
+
+The bridge uses ordinary ACP negotiation, permission requests and persisted
+session bindings. Native execution and history remain owned by the harness.
+Configured environment entries are explicit; the child otherwise receives the
+same restricted ambient environment as the other non-OpenCode backends, not the
+whole bridge environment. If the provider needs a credential, name it in the
+harness configuration and pass only that required variable through the backend's
+`env` using `{env:NAME}`. The bridge does not log in, copy credentials or silently
+switch models. Never put credential values in tracked configuration.
+
+For the built-in `soulsteads` backend, text sent in an active Matrix thread is
+acknowledged as queued, not live steering. Up to eight pending messages are kept
+in memory and submitted in FIFO order on the same native session, each only
+after the previous prompt returns `end_turn`. The existing thread collector
+retains their output. Cancellation, a non-successful prompt result, disconnect,
+or collector shutdown discards unsubmitted messages; restarting does not restore
+them. Already submitted prompts are never retried automatically. Image follow-ups
+are rejected without submission. Other ACP backends keep their existing steering
+behavior.
+
+Native capabilities and limits apply: unsupported controls fail rather than
+being emulated by another harness. Separate conversation bindings do not provide
+filesystem isolation when they share one configured workspace. This integration
+is not an OS sandbox or general ACP/editor/platform certification.
 
 ## GitHub Copilot CLI (native ACP)
 

@@ -1,8 +1,8 @@
 #![cfg(feature = "platform-sdks")]
 
 use axum::{Json, Router, extract::Request, response::IntoResponse, routing::any};
-use soulsteads_messaging::{config, connectors::matrix};
 use serde_json::{Value, json};
+use soulsteads_messaging::{config, connectors::matrix};
 use std::{future::IntoFuture, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 

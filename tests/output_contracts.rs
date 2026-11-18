@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
 };
-use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path};
 use tokio::sync::Mutex;
 
@@ -343,8 +343,11 @@ async fn failed_image_upload_and_display_never_replay_side_effects() {
 #[tokio::test]
 async fn annotation_only_owned_media_delivers_without_retry_and_reports_delivery_length() {
     let root = tempfile::tempdir().unwrap();
-    let session =
-        soulsteads_messaging::runtime::session_dir(&root.path().join("sessions"), "matrix", "!room:local");
+    let session = soulsteads_messaging::runtime::session_dir(
+        &root.path().join("sessions"),
+        "matrix",
+        "!room:local",
+    );
     std::fs::create_dir_all(&session).unwrap();
     let path = session.join("annotation.png");
     std::fs::write(&path, png()).unwrap();

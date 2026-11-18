@@ -1,8 +1,8 @@
 use anyhow::{Result, bail};
 use async_trait::async_trait;
-use soulsteads_messaging::{media, runtime::Sink};
 use regex::Regex;
 use serde_json::Value;
+use soulsteads_messaging::{media, runtime::Sink};
 use std::{
     collections::HashSet,
     io::{self, Write},

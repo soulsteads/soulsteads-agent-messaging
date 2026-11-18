@@ -929,6 +929,9 @@ impl State {
         let offered_accept = params["availableDecisions"]
             .as_array()
             .is_none_or(|options| options.iter().any(|option| option == "accept"));
+        let offered_decline = params["availableDecisions"]
+            .as_array()
+            .is_none_or(|options| options.iter().any(|option| option == "decline"));
         let mut options =
             vec![json!({"optionId":"reject-once","name":"Reject once","kind":"reject_once"})];
         if offered_accept {
@@ -941,7 +944,7 @@ impl State {
             .as_str()
             .context("Codex approval omitted item ID")?;
         let permission = json!({"sessionId":session.id,"toolCall":{"toolCallId":tool_id,"title":params["command"].as_str().or_else(||params["reason"].as_str()).unwrap_or("Codex tool approval"),
-            "kind":if message.method.contains("commandExecution") {"execute"} else {"edit"},"status":"pending","rawInput":params},"options":options});
+            "kind":if message.method.contains("commandExecution") {"execute"} else {"edit"},"status":"pending","rawInput":approval_input(params)},"options":options});
         let future = self
             .client()?
             .send_request(UntypedMessage::new(
@@ -972,7 +975,9 @@ impl State {
                     "accept"
                 }
                 Some(outcome)
-                    if outcome["outcome"] == "selected" && outcome["optionId"] == "reject-once" =>
+                    if outcome["outcome"] == "selected"
+                        && outcome["optionId"] == "reject-once"
+                        && offered_decline =>
                 {
                     "decline"
                 }

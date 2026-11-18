@@ -1,5 +1,5 @@
-use soulsteads_messaging::tools::{Presenter, hermes, matrix_notice};
 use serde_json::{Value, json};
+use soulsteads_messaging::tools::{Presenter, hermes, matrix_notice};
 
 #[test]
 fn skill_names_support_opencode_id_and_legacy_name() {

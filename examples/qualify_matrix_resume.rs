@@ -2,12 +2,12 @@
 //! No Matrix client, prompt, generation, or message publication is performed.
 use anyhow::{Context, Result, ensure};
 use async_trait::async_trait;
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
     store::{Entry, Store},
 };
-use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     path::PathBuf,

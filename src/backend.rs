@@ -82,6 +82,14 @@ impl Client {
     pub fn working_directory(&self) -> &std::path::Path {
         dispatch!(self, working_directory)
     }
+    pub fn queues_followups(&self) -> bool {
+        matches!(self, Self::Acp(client) if client.queues_followups())
+    }
+    pub fn enable_serial_followups(&self) {
+        if let Self::Acp(client) = self {
+            client.enable_serial_followups();
+        }
+    }
     pub fn accepts_followups(&self) -> bool {
         dispatch!(self, accepts_followups)
     }

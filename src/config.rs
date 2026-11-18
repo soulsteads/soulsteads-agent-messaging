@@ -140,6 +140,33 @@ pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String
     Ok(())
 }
 
+/// Refuse ambiguous remote access at the service boundary. An empty allowlist
+/// must never accidentally expose a native harness to every chat participant.
+pub fn validate_connector_access(config: &Value, env: &BTreeMap<String, String>) -> Result<()> {
+    for platform in [
+        "matrix",
+        "mattermost",
+        "telegram",
+        "slack",
+        "discord",
+        "whatsapp",
+    ] {
+        let connector = &config[platform];
+        if connector["enabled"] != true {
+            continue;
+        }
+        let allowed = env
+            .get(&format!("{}_ALLOWED_USERS", platform.to_uppercase()))
+            .map(|value| crate::runtime::csv(value))
+            .filter(|values| !values.is_empty())
+            .unwrap_or_else(|| strings(connector, "allowedUsers"));
+        if allowed.is_empty() && connector["allowAllUsers"] != true {
+            bail!("{platform}: set allowedUsers or explicitly opt in with allowAllUsers=true");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
     let Some(tools) = config
         .get("agentMessaging")

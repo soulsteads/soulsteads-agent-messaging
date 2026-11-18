@@ -1,5 +1,5 @@
-use soulsteads_messaging::acp::{Client, Options};
 use serde_json::json;
+use soulsteads_messaging::acp::{Client, Options};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 fn followup_fixture(directory: &std::path::Path, actions: serde_json::Value) -> Options {
@@ -886,4 +886,163 @@ fn isolated_backend_inherits_runtime_proxies_not_ambient_secrets() {
         assert_eq!(seen["NO_PROXY"], "localhost,127.0.0.1");
         client.shutdown().await.unwrap();
     });
+}
+
+#[tokio::test]
+async fn serial_followups_are_bounded_fifo_and_wait_for_each_wire_response() {
+    let directory = tempfile::tempdir().unwrap();
+    let client = Client::connect(followup_fixture(
+        directory.path(),
+        json!(vec![json!({"hold":true}); 9]),
+    ))
+    .await
+    .unwrap();
+    client.enable_serial_followups();
+    let session = client.new_session().await.unwrap();
+    let worker = client.clone();
+    let task = tokio::spawn(async move { worker.prompt("original", vec![]).await });
+    let mut current = prompt_rpc(directory.path(), "original").await;
+    for index in 0..8 {
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            client.forward(&format!("queued-{index}")),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+    assert_eq!(
+        client.forward("overflow").await.unwrap_err().to_string(),
+        "ACP follow-up queue full"
+    );
+    // A control RPC roundtrip is a wire barrier: accepted follow-ups must still
+    // be absent from the peer until the original response settles.
+    emit_barrier(&client, json!([])).await;
+    assert_eq!(
+        rpc_audit(directory.path())
+            .iter()
+            .filter(|v| v["method"] == "session/prompt")
+            .count(),
+        1
+    );
+    for index in 0..8 {
+        emit_barrier(
+            &client,
+            json!([
+                text_update(&format!("answer-{index}")),
+                completed_rpc(&current, "end_turn")
+            ]),
+        )
+        .await;
+        current = prompt_rpc(directory.path(), &format!("queued-{index}")).await;
+        assert_eq!(current["params"]["sessionId"], session);
+        emit_barrier(&client, json!([])).await;
+        assert_eq!(
+            rpc_audit(directory.path())
+                .iter()
+                .filter(|v| v["method"] == "session/prompt")
+                .count(),
+            index + 2
+        );
+        assert!(!task.is_finished());
+    }
+    emit_barrier(
+        &client,
+        json!([text_update("answer-8"), completed_rpc(&current, "end_turn")]),
+    )
+    .await;
+    let result = tokio::time::timeout(Duration::from_secs(2), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    for index in 0..9 {
+        assert!(result.text.contains(&format!("answer-{index}")));
+    }
+    assert!(!client.accepts_followups());
+    assert!(client.forward("late").await.is_err());
+    client.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn serial_followups_discard_on_cancel_error_disconnect_and_collector_drop() {
+    for boundary in [
+        "cancel",
+        "error",
+        "refusal",
+        "disconnect",
+        "drop",
+        "queued-error",
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let client = Client::connect(followup_fixture(
+            directory.path(),
+            json!(vec![json!({"hold":true}); 4]),
+        ))
+        .await
+        .unwrap();
+        client.enable_serial_followups();
+        client.new_session().await.unwrap();
+        let worker = client.clone();
+        let task = tokio::spawn(async move { worker.prompt("original", vec![]).await });
+        let original = prompt_rpc(directory.path(), "original").await;
+        client.forward("queued").await.unwrap();
+        client.forward("discard-me").await.unwrap();
+        match boundary {
+            "cancel" => {
+                client.cancel().await.unwrap();
+                // Even a late successful response cannot resurrect queued work.
+                emit_barrier(&client, json!([completed_rpc(&original, "end_turn")])).await;
+            }
+            "error" => emit_barrier(&client, json!([{"jsonrpc":"2.0","id":original["id"],"error":{"code":-32000,"message":"unknown effects"}}])).await,
+            "refusal" => emit_barrier(&client, json!([completed_rpc(&original, "refusal")])).await,
+            "disconnect" => { client.shutdown().await.unwrap(); }
+            "drop" => { task.abort(); }
+            "queued-error" => {
+                emit_barrier(&client, json!([completed_rpc(&original, "end_turn")])).await;
+                let queued = prompt_rpc(directory.path(), "queued").await;
+                emit_barrier(&client, json!([{"jsonrpc":"2.0","id":queued["id"],"error":{"code":-32000,"message":"unknown queued effects"}}])).await;
+            }
+            _ => unreachable!(),
+        }
+        let outcome = tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .unwrap();
+        if matches!(boundary, "error" | "disconnect" | "queued-error") {
+            assert!(outcome.unwrap().is_err());
+        }
+        assert!(!client.accepts_followups());
+        assert!(client.forward("late").await.is_err());
+        if boundary != "disconnect" {
+            let worker = client.clone();
+            let next = tokio::spawn(async move { worker.prompt("fresh", vec![]).await });
+            let fresh = prompt_rpc(directory.path(), "fresh").await;
+            emit_barrier(
+                &client,
+                json!([
+                    text_update("fresh answer"),
+                    completed_rpc(&fresh, "end_turn")
+                ]),
+            )
+            .await;
+            next.await.unwrap().unwrap();
+        }
+        client.shutdown().await.unwrap();
+        let prompts: Vec<_> = rpc_audit(directory.path())
+            .into_iter()
+            .filter(|v| v["method"] == "session/prompt")
+            .map(|v| {
+                v["params"]["prompt"][0]["text"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        let expected = match boundary {
+            "disconnect" => vec!["original"],
+            "queued-error" => vec!["original", "queued", "fresh"],
+            _ => vec!["original", "fresh"],
+        };
+        assert_eq!(prompts, expected, "{boundary}");
+    }
 }

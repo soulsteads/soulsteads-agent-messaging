@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, ensure};
-use soulsteads_messaging::backend::{Client, Options, Transport};
 use serde_json::json;
+use soulsteads_messaging::backend::{Client, Options, Transport};
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 #[tokio::main]

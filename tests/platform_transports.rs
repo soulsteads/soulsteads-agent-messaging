@@ -5,12 +5,12 @@ use axum::{
     response::IntoResponse,
     routing::any,
 };
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     connectors::http::Platform,
     runtime::{Bridge, Sink},
 };
-use serde_json::{Value, json};
 use std::{collections::BTreeMap, future::IntoFuture, sync::Arc};
 use tokio::sync::Mutex;
 

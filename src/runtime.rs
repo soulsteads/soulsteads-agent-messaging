@@ -849,7 +849,7 @@ fn normalize_agent_homes(config: &mut Value, env: &BTreeMap<String, String>) -> 
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_default()
         .into();
-    for backend in ["opencode", "codex", "claude", "pi", "copilot"] {
+    for backend in ["opencode", "codex", "claude", "pi", "copilot", "soulsteads"] {
         let Some(settings) = config["acp"]["backends"][backend].as_object_mut() else {
             continue;
         };
@@ -1005,6 +1005,7 @@ impl Bridge {
         workspace: PathBuf,
         restart_dispatcher: Arc<dyn RestartDispatcher>,
     ) -> Result<Self> {
+        crate::config::validate_connector_access(&config, &env)?;
         validate_agent_tools(&config)?;
         normalize_agent_homes(&mut config, &env)?;
         if config["agentMessaging"]["tools"]["enabled"] == true {
@@ -2098,6 +2099,9 @@ impl Bridge {
             servers,
         )
         .await?;
+        if backend == "soulsteads" {
+            client.enable_serial_followups();
+        }
         Ok((client, identity))
     }
     async fn picker(
@@ -2415,7 +2419,7 @@ impl Bridge {
         sink.emit(json!({"type":"response","text":text})).await
     }
     fn backend_config(&self, backend: &str) -> Result<&Value> {
-        if !["opencode", "codex", "claude", "pi", "copilot"].contains(&backend) {
+        if !["opencode", "codex", "claude", "pi", "copilot", "soulsteads"].contains(&backend) {
             bail!("Unknown or unconfigured backend");
         }
         if self.config["acp"]["backends"][backend].is_object() {
@@ -2603,6 +2607,8 @@ impl Bridge {
                     .is_err()
                 {
                     sink.emit(json!({"type":"response","text":"Sorry, the backend did not accept your additional message."})).await?;
+                } else if client.queues_followups() {
+                    sink.emit(json!({"type":"notice","text":"Additional message queued for this session after the current request. Unsubmitted queued messages are discarded on cancellation, non-successful completion or disconnect."})).await?;
                 }
                 return Ok(());
             }
@@ -3467,6 +3473,34 @@ pub fn csv(value: &str) -> Vec<String> {
 #[path = "runtime_expiry_tests.rs"]
 mod expiry_tests;
 
+pub fn session_dir(base: &Path, platform: &str, identifier: &str) -> PathBuf {
+    let sanitized: String = identifier
+        .encode_utf16()
+        .map(|unit| {
+            if unit <= 127 && (unit as u8).is_ascii_alphanumeric() || unit == 45 || unit == 95 {
+                char::from_u32(unit as u32).unwrap()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let prefix: String = sanitized.chars().take(120).collect();
+    let prefix = if prefix.is_empty() {
+        "thread".into()
+    } else {
+        prefix
+    };
+    let leaf = if sanitized != identifier || sanitized.len() > prefix.len() {
+        format!(
+            "{prefix}-{}",
+            &format!("{:x}", Sha256::digest(identifier.as_bytes()))[..12]
+        )
+    } else {
+        prefix
+    };
+    base.join(platform).join(leaf)
+}
+
 #[cfg(test)]
 mod resolved_prompt_tests {
     use super::*;
@@ -3510,8 +3544,8 @@ mod resolved_prompt_tests {
             },
         );
 
-        assert_eq!(submission.interaction.permissions, true);
-        assert_eq!(submission.interaction.forms, true);
+        assert!(submission.interaction.permissions);
+        assert!(submission.interaction.forms);
         assert_eq!(
             submission.interaction.scope.as_ref().unwrap().context,
             "matrix\0!room:example:$thread"
@@ -3559,31 +3593,4 @@ mod resolved_prompt_tests {
         assert_eq!(submission.presentation.terminal_thread, Value::Null);
         assert!(!submission.presentation.matrix_full_paths);
     }
-}
-pub fn session_dir(base: &Path, platform: &str, identifier: &str) -> PathBuf {
-    let sanitized: String = identifier
-        .encode_utf16()
-        .map(|unit| {
-            if unit <= 127 && (unit as u8).is_ascii_alphanumeric() || unit == 45 || unit == 95 {
-                char::from_u32(unit as u32).unwrap()
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    let prefix: String = sanitized.chars().take(120).collect();
-    let prefix = if prefix.is_empty() {
-        "thread".into()
-    } else {
-        prefix
-    };
-    let leaf = if sanitized != identifier || sanitized.len() > prefix.len() {
-        format!(
-            "{prefix}-{}",
-            &format!("{:x}", Sha256::digest(identifier.as_bytes()))[..12]
-        )
-    } else {
-        prefix
-    };
-    base.join(platform).join(leaf)
 }

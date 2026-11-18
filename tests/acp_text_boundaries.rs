@@ -1,5 +1,5 @@
-use soulsteads_messaging::acp::{Client, Options};
 use serde_json::{Value, json};
+use soulsteads_messaging::acp::{Client, Options};
 use std::{collections::BTreeMap, time::Duration};
 
 fn text(text: &str) -> Value {

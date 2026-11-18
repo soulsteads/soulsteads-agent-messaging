@@ -55,6 +55,11 @@ async fn start() -> Result<()> {
     let mut configuration =
         config::Loader::default().load(&cwd, arguments.config.as_deref(), &environment)?;
     config::apply_runtime_overrides(&mut configuration, &environment)?;
+    // Validate even for --check-config, before connecting any chat service.
+    config::validate_connector_access(&configuration, &environment).map_err(|error| {
+        eprintln!("Connector access configuration: {error}");
+        error
+    })?;
     let home = environment
         .get("HOME")
         .map(PathBuf::from)
@@ -289,6 +294,10 @@ async fn shutdown_signal() -> std::io::Result<()> {
 }
 
 #[cfg(test)]
+#[path = "../tests/support/acp_fixture_path.rs"]
+mod fixture_path;
+
+#[cfg(test)]
 mod retention_startup_tests {
     use super::*;
     use serde_json::{Value, json};
@@ -318,14 +327,7 @@ mod retention_startup_tests {
             }
             let environment =
                 config::project_environment(directory.path(), BTreeMap::new()).unwrap();
-            let executable = std::env::current_exe().unwrap();
-            let fixture = executable
-                .parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .join("acp-fixture");
-            assert!(fixture.is_file());
+            let fixture = fixture_path::acp_fixture();
             let configuration = config::load(&json!({"rateLimitSeconds":0,"web":{"enabled":true},"sessionStorePath":directory.path().join("store.json"),"acp":{"command":fixture,"args":[]}}).to_string(), &environment).unwrap();
             let bridge = Bridge::new(
                 configuration.clone(),

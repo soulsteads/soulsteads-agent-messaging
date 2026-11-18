@@ -1,6 +1,6 @@
 use axum::{Json, Router, extract::Request, response::IntoResponse, routing::any};
-use soulsteads_messaging::native_queue::NativeQueue;
 use serde_json::{Value, json};
+use soulsteads_messaging::native_queue::NativeQueue;
 use std::sync::{Arc, Mutex};
 #[derive(Default)]
 struct Seen(Mutex<Vec<(String, Value)>>);

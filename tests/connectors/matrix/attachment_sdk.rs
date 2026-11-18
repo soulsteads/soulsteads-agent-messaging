@@ -114,7 +114,9 @@ async fn exercise(
         .unwrap();
     let (shutdown, receive) = tokio::sync::watch::channel(false);
     let task = tokio::spawn(super::run(client, bridge.clone(), receive));
-    tokio::time::timeout(Duration::from_secs(27), async {
+    // Progress-based wait (sync count / reply); the deadline only bounds a hang and
+    // is generous so a heavily loaded host does not fail a correct run.
+    tokio::time::timeout(Duration::from_secs(120), async {
         loop {
             if (mode == "late-followup" && fixture.syncs.load(Ordering::SeqCst) > 150)
                 || (mode != "late-followup"

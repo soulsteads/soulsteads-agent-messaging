@@ -4,8 +4,8 @@ use axum::{
     response::{IntoResponse, Response},
     routing::any,
 };
-use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use serde_json::json;
+use soulsteads_messaging::{config, connectors::http::Platform, runtime::Bridge};
 use std::{collections::BTreeMap, future::IntoFuture, sync::Arc};
 use tokio::sync::Mutex;
 #[derive(Clone, Default)]

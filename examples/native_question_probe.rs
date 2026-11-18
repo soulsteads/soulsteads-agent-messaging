@@ -1,10 +1,10 @@
 use anyhow::{Context, Result, ensure};
 use async_trait::async_trait;
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     runtime::{Bridge, Event, Sink},
 };
-use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 

@@ -1,10 +1,10 @@
 use async_trait::async_trait;
+use serde_json::{Value, json};
 use soulsteads_messaging::{
     config,
     connectors::http::Platform,
     runtime::{Bridge, Sink},
 };
-use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tokio::sync::Mutex;
 

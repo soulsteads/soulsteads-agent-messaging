@@ -1,5 +1,5 @@
-use soulsteads_messaging::acp::{Client, Options};
 use serde_json::Value;
+use soulsteads_messaging::acp::{Client, Options};
 use std::{collections::BTreeMap, time::Duration};
 #[path = "support/acp_peer.rs"]
 mod acp_peer;

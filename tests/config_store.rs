@@ -238,6 +238,24 @@ fn all_source_configuration_oracles_match_without_panics() {
                 Some(serde_json::json!(false))
             );
         }
+        // Explicit connector access (`allowAllUsers`, default closed) is a
+        // Rust-only extension absent from the legacy source oracle.
+        for connector in [
+            "telegram",
+            "discord",
+            "slack",
+            "whatsapp",
+            "matrix",
+            "mattermost",
+        ] {
+            if let Some(section) = actual[connector].as_object_mut() {
+                assert_eq!(
+                    section.remove("allowAllUsers"),
+                    Some(serde_json::json!(false)),
+                    "{connector} must default to closed access"
+                );
+            }
+        }
         let mut expected = case["expected"].clone();
         // The built-in Rust backend is an intentional migration extension.
         // Preserve explicit legacy overrides and compare all other fields.

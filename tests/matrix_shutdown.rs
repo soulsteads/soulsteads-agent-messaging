@@ -1,7 +1,7 @@
 #![cfg(feature = "platform-sdks")]
 use axum::{Json, Router, extract::Request, response::IntoResponse, routing::any};
-use soulsteads_messaging::{config, connectors::matrix, runtime::Bridge};
 use serde_json::json;
+use soulsteads_messaging::{config, connectors::matrix, runtime::Bridge};
 use std::{collections::BTreeMap, future::IntoFuture, sync::Arc, time::Duration};
 
 async fn stalled_transport_shutdown(invite: bool) {

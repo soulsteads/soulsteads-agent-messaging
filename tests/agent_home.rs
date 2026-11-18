@@ -53,7 +53,7 @@ fn rpc(path: &Path) -> Vec<Value> {
 
 #[tokio::test]
 async fn configured_agent_home_is_canonical_cwd_for_every_backend_and_override_wins() {
-    for backend in ["opencode", "codex", "claude", "pi", "copilot"] {
+    for backend in ["opencode", "codex", "claude", "pi", "copilot", "soulsteads"] {
         let root = tempfile::tempdir().unwrap();
         let inherited = home(root.path(), "inherited");
         let override_home = home(root.path(), "override");
@@ -103,6 +103,31 @@ async fn invalid_agent_home_fails_closed_before_fixture_launch() {
         settings["acp"]["env"]["ACP_FIXTURE_RPC_AUDIT"] = audit.to_string_lossy().into();
         assert!(Bridge::new(settings, BTreeMap::new(), root.path().join("sessions")).is_err());
         assert!(!audit.exists());
+    }
+}
+
+#[tokio::test]
+async fn soulsteads_backend_rejects_invalid_home_override_before_launch() {
+    for home in [
+        json!("relative"),
+        json!(42),
+        json!("/definitely/missing-soulsteads-home"),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let audit = root.path().join("native-audit.jsonl");
+        let mut settings = configuration(root.path(), json!(""));
+        settings["acp"]["defaultBackend"] = "soulsteads".into();
+        settings["acp"]["backends"]["soulsteads"] = json!({
+            "command": env!("CARGO_BIN_EXE_acp-fixture"),
+            "args": [],
+            "agentHome": home,
+            "env": {"ACP_FIXTURE_RPC_AUDIT": audit}
+        });
+        assert!(Bridge::new(settings, BTreeMap::new(), root.path().join("sessions")).is_err());
+        assert!(
+            !audit.exists(),
+            "invalid Home must refuse before native launch"
+        );
     }
 }
 

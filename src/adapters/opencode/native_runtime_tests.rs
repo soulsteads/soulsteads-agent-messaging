@@ -292,7 +292,9 @@ async fn native_command_requires_verified_acknowledgement_and_new_durable_termin
     for behavior in ["empty-ack", "wrong-ack", "rejected"] {
         let root = tempfile::tempdir().unwrap();
         let mut config = options(root.path());
-        config.timeout = Duration::from_millis(300);
+        // Bounds both fixture start-up and the prompt; keep generous so a loaded host
+        // cannot fail readiness before the behavior under test is exercised.
+        config.timeout = Duration::from_secs(5);
         config
             .env
             .insert("NATIVE_FIXTURE_COMMAND_BEHAVIOR".into(), behavior.into());
