@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0" /></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-orange" alt="Version 0.2.0" />
+  <img src="https://img.shields.io/badge/version-0.3.0-orange" alt="Version 0.3.0" />
   <img src="https://img.shields.io/badge/rust-2024-informational?logo=rust" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/status-early%20release-yellow" alt="Status: early release" />
 </p>
