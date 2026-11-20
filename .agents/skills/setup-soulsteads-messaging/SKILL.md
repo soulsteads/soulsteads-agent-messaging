@@ -1,7 +1,7 @@
 ---
 name: setup-soulsteads-messaging
 description: Set up a Telegram gateway for a local agent harness.
-version: 0.2.0
+version: 0.3.0
 author: Scott Glover (scottgl), with agent assistance
 license: MIT
 platforms: [linux]
