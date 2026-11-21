@@ -150,7 +150,15 @@ impl Broker {
         let entry = pending.remove(id).unwrap();
         entry.decision.send(approve).is_ok()
     }
-    pub(crate) async fn request(&self, scope: Scope, request: PermissionRequest, sink: &dyn Sink) {
+    pub(crate) async fn request(
+        &self,
+        mut scope: Scope,
+        request: PermissionRequest,
+        sink: &dyn Sink,
+    ) {
+        if let Some(thread) = sink.matrix_approval_thread() {
+            scope.thread = thread;
+        }
         self.request_until(
             scope,
             request,
@@ -198,9 +206,7 @@ impl Broker {
             "Approval required — one operation only\n{display}\n\n/approve {id}\n/deny {id}\nExpires in 45 minutes. Reply in the same room/thread from the requesting account."
         );
         let result = async {
-            sink.emit(json!({"type":"notice", "text":body}))
-                .await
-                .ok()?;
+            sink.emit_approval_notice(body).await.ok()?;
             if !request.current.load(Ordering::SeqCst) {
                 return None;
             }

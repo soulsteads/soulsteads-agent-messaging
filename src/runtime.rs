@@ -291,6 +291,14 @@ pub trait Sink: Send + Sync {
     fn matrix_raw_thread(&self) -> Option<String> {
         None
     }
+    /// Origin-side scope for an approval notice. Control ingress still uses
+    /// the actual thread relation of the incoming decision.
+    fn matrix_approval_thread(&self) -> Option<String> {
+        None
+    }
+    async fn emit_approval_notice(&self, text: String) -> Result<()> {
+        self.emit(json!({"type":"notice", "text":text})).await
+    }
     fn owned(&self) -> Option<Arc<dyn Sink>> {
         None
     }
@@ -3151,42 +3159,73 @@ impl Bridge {
             submission.presentation.terminal_thread.clone(),
         )
         .with_matrix_full_paths(submission.presentation.matrix_full_paths);
-        let result = loop {
-            tokio::select! {
-                result = &mut prompt => break result,
-                request = async { match form_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
-                    if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
-                        questions.push(self.questions.request(scope.clone(), request.form, request.current, request.reply, sink));
-                    } else { form_requests = None; }
-                }
-                Some(()) = questions.next(), if !questions.is_empty() => {}
-                request = async { match permission_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
-                    if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
-                        approvals.push(self.permissions.request(scope.clone(), request, sink));
-                    } else { permission_requests = None; }
-                }
-                _ = approvals.next(), if !approvals.is_empty() => {},
-                update = receiver.recv() => {
+        let result = {
+            let (finish_presentation, mut prompt_finished) = tokio::sync::oneshot::channel();
+            // Progress and broker notices can contend for the same connector send lock.
+            // Poll this ordered presentation lane alongside the brokers, not inside
+            // a select branch that would stop polling the current lock holder.
+            let present = async {
+                loop {
+                    let update = tokio::select! {
+                        biased;
+                        _ = &mut prompt_finished => break,
+                        update = receiver.recv() => update,
+                    };
                     match update {
                         Ok(update) => {
                             if submission.presentation.live_updates {
-                                deliver_inline(client, sink, &mut delivery, update["collectorImageCount"].as_u64().unwrap_or(0) as usize).await;
+                                deliver_inline(
+                                    client,
+                                    sink,
+                                    &mut delivery,
+                                    update["collectorImageCount"].as_u64().unwrap_or(0) as usize,
+                                )
+                                .await;
                                 present_update(sink, &update, &mut captured, &mut presenter).await;
                             }
-                        },
+                        }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
                             presentation_lost = true;
                             if submission.presentation.live_updates {
                                 let _ = sink.emit(json!({"type":"error","message":"Activity stream overflow; final response remains intact."})).await;
                             }
-                        },
-                        Err(_) => break Err(anyhow::anyhow!("ACP update channel closed")),
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     }
                 }
+            };
+            tokio::pin!(present);
+            let (result, prompt_settled) = loop {
+                tokio::select! {
+                    result = &mut prompt => break (result, true),
+                    // Before finish_presentation is sent, only channel closure can end this lane.
+                    () = &mut present => break (Err(anyhow::anyhow!("ACP update channel closed")), false),
+                    request = async { match form_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
+                        if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
+                            questions.push(self.questions.request(scope.clone(), request.form, request.current, request.reply, sink));
+                        } else { form_requests = None; }
+                    }
+                    Some(()) = questions.next(), if !questions.is_empty() => {}
+                    request = async { match permission_requests.as_mut() { Some(requests) => requests.recv().await, None => std::future::pending().await } } => {
+                        if let (Some(request), Some(scope)) = (request, scope.as_ref()) {
+                            approvals.push(self.permissions.request(scope.clone(), request, sink));
+                        } else { permission_requests = None; }
+                    }
+                    _ = approvals.next(), if !approvals.is_empty() => {},
+                }
+            };
+            // Invalidate pending controls and release their send locks before
+            // finishing any in-flight presentation and draining buffered updates.
+            drop(approvals);
+            drop(_permission_guard);
+            drop(questions);
+            drop(_form_guard);
+            if prompt_settled {
+                let _ = finish_presentation.send(());
+                present.await;
             }
+            result
         };
-        drop(approvals);
-        drop(_permission_guard);
         loop {
             match receiver.try_recv() {
                 Ok(update) => {

@@ -1,16 +1,24 @@
 //! Native outbound HTTP acknowledgment composed with real Matrix ingress and ACP.
 use super::*;
 use axum::{Json, Router, extract::Request, response::IntoResponse, routing::any};
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
-#[derive(Clone, Default)]
-struct Controls;
+struct DecisionSink {
+    raw_thread: &'static str,
+    recorded: AtomicBool,
+}
 #[async_trait]
-impl Sink for Controls {
+impl Sink for DecisionSink {
     fn matrix_raw_thread(&self) -> Option<String> {
-        Some("$root".into())
+        Some(self.raw_thread.into())
     }
-    async fn emit(&self, _: Value) -> Result<()> {
+    async fn emit(&self, event: Value) -> Result<()> {
+        if event["text"] == "Approval decision recorded." {
+            self.recorded.store(true, Ordering::SeqCst);
+        }
         Ok(())
     }
 }
@@ -29,6 +37,15 @@ fn event(text: String) -> Event {
         reply_to: None,
     }
 }
+fn decision_event(text: String, raw_thread: &str) -> Event {
+    let mut event = event(text);
+    event.thread = if raw_thread.is_empty() {
+        event.id.clone()
+    } else {
+        raw_thread.to_owned()
+    };
+    event
+}
 fn replies(path: &std::path::Path) -> Vec<Value> {
     std::fs::read_to_string(path)
         .unwrap_or_default()
@@ -38,7 +55,15 @@ fn replies(path: &std::path::Path) -> Vec<Value> {
         .collect()
 }
 
-async fn native_approval_case(fail: bool, cancel: bool) {
+#[derive(Clone, Copy)]
+enum ThreadMode {
+    Explicit,
+    Synthesized,
+    ExplicitWithSharedSession,
+    Room,
+}
+
+async fn native_approval_case(fail: bool, cancel: bool, mode: ThreadMode) {
     let notices = Arc::new(tokio::sync::Mutex::new(Vec::<Value>::new()));
     let entered = Arc::new(tokio::sync::Semaphore::new(0));
     let release = Arc::new(tokio::sync::Semaphore::new(0));
@@ -84,10 +109,16 @@ async fn native_approval_case(fail: bool, cancel: bool) {
     });
     let directory = tempfile::tempdir().unwrap();
     let audit = directory.path().join("rpc.jsonl");
+    let isolation = matches!(mode, ThreadMode::Explicit | ThreadMode::Synthesized);
+    let raw = matches!(
+        mode,
+        ThreadMode::Explicit | ThreadMode::ExplicitWithSharedSession
+    );
+    let room_level = matches!(mode, ThreadMode::Room);
     let configuration = crate::config::load(&json!({"rateLimitSeconds":0,"sessionStorePath":directory.path().join("store.json"),
         "toolMessages":{"mode":"off"},
         "acp":{"command":"/usr/bin/python3","args":[concat!(env!("CARGO_MANIFEST_DIR"),"/tests/fixtures/matrix-approval-peer.py")],"env":{"APPROVAL_AUDIT":audit}},
-        "matrix":{"homeserver":base,"userId":"@bot:local","accessToken":"fixture","encryption":{"enabled":false},"respondToAllMessages":true,"interactivePermissions":true,"allowedUsers":["@human:local"],"allowedRooms":["!room:local"],"strictAllowedRooms":true}
+        "matrix":{"homeserver":base,"userId":"@bot:local","accessToken":"fixture","encryption":{"enabled":false},"respondToAllMessages":true,"interactivePermissions":true,"threadIsolation":isolation,"allowedUsers":["@human:local"],"allowedRooms":["!room:local"],"strictAllowedRooms":true}
     }).to_string(), &BTreeMap::new()).unwrap();
     let bridge = Arc::new(
         Bridge::new(
@@ -104,20 +135,24 @@ async fn native_approval_case(fail: bool, cancel: bool) {
     let room = client.get_room("!room:local".try_into().unwrap()).unwrap();
     let sink = Arc::new(MatrixSink {
         room,
-        thread: Some("$root".try_into().unwrap()),
-        raw_thread: Some("$root".try_into().unwrap()),
+        thread: isolation.then(|| "$root".try_into().unwrap()),
+        raw_thread: raw.then(|| "$root".try_into().unwrap()),
         html: false,
         rich_tools: false,
         activities: Default::default(),
         indicators: TypingManager::new(Arc::new(NativeTyping(client)), Duration::from_secs(4)),
         typing: Default::default(),
-        incoming: "$incoming".try_into().unwrap(),
+        incoming: if raw { "$incoming" } else { "$root" }.try_into().unwrap(),
         reply_context: Default::default(),
     });
     let task = {
         let bridge = bridge.clone();
         let sink = sink.clone();
-        tokio::spawn(async move { bridge.handle(event("work".into()), sink.as_ref()).await })
+        tokio::spawn(async move {
+            let mut work = event("work".into());
+            work.id = sink.incoming.to_string();
+            bridge.handle(work, sink.as_ref()).await
+        })
     };
     tokio::time::timeout(Duration::from_secs(5), entered.acquire())
         .await
@@ -126,7 +161,12 @@ async fn native_approval_case(fail: bool, cancel: bool) {
         .forget();
     let notice = notices.lock().await[0].clone();
     assert_eq!(notice["msgtype"], "m.notice");
-    assert_eq!(notice["m.relates_to"]["event_id"], "$root");
+    if room_level {
+        assert!(notice.get("m.relates_to").is_none());
+    } else {
+        assert_eq!(notice["m.relates_to"]["rel_type"], "m.thread");
+        assert_eq!(notice["m.relates_to"]["event_id"], "$root");
+    }
     let id = notice["body"]
         .as_str()
         .unwrap()
@@ -137,10 +177,18 @@ async fn native_approval_case(fail: bool, cancel: bool) {
         .next()
         .unwrap();
     let approve = format!("/approve {id}");
+    let controls = DecisionSink {
+        raw_thread: if room_level { "" } else { "$root" },
+        recorded: AtomicBool::new(false),
+    };
     bridge
-        .handle(event(approve.clone()), &Controls)
+        .handle(
+            decision_event(approve.clone(), controls.raw_thread),
+            &controls,
+        )
         .await
         .unwrap();
+    assert!(!controls.recorded.load(Ordering::SeqCst));
     assert!(
         replies(&audit).is_empty(),
         "native HTTP arrival is not acknowledgment"
@@ -148,31 +196,59 @@ async fn native_approval_case(fail: bool, cancel: bool) {
     assert!(!task.is_finished());
     if cancel {
         bridge
-            .handle(event("/cancel".into()), &Controls)
+            .handle(
+                decision_event("/cancel".into(), controls.raw_thread),
+                &controls,
+            )
             .await
             .unwrap();
     }
     release.add_permits(1);
     if !fail && !cancel {
+        // Continue testing wrong scopes after the HTTP response as well as
+        // checking the correct scope before acknowledgment. A shared native
+        // session must not make unrelated Matrix threads interchangeable.
+        let wrong_root = DecisionSink {
+            raw_thread: "$elsewhere",
+            recorded: AtomicBool::new(false),
+        };
+        let wrong_level = DecisionSink {
+            raw_thread: if room_level { "$root" } else { "" },
+            recorded: AtomicBool::new(false),
+        };
         // Each attempted input has a fresh event ID; ACK-to-broker scheduling is asynchronous.
         tokio::time::timeout(Duration::from_secs(5), async {
             while replies(&audit).is_empty() {
+                for wrong in [&wrong_root, &wrong_level] {
+                    bridge
+                        .handle(decision_event(approve.clone(), wrong.raw_thread), wrong)
+                        .await
+                        .unwrap();
+                    assert!(!wrong.recorded.load(Ordering::SeqCst));
+                }
                 bridge
-                    .handle(event(approve.clone()), &Controls)
+                    .handle(
+                        decision_event(approve.clone(), controls.raw_thread),
+                        &controls,
+                    )
                     .await
                     .unwrap();
-                tokio::task::yield_now().await;
+                tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
         .await
-        .unwrap();
+        .expect("approval from the exact published destination did not reach ACP");
+        assert!(controls.recorded.load(Ordering::SeqCst));
     }
     tokio::time::timeout(Duration::from_secs(5), task)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    bridge.handle(event(approve), &Controls).await.unwrap();
+    bridge
+        .handle(decision_event(approve, controls.raw_thread), &controls)
+        .await
+        .unwrap();
     let decisions = replies(&audit);
     assert_eq!(decisions.len(), 1, "one grant/denial, no late replay");
     assert_eq!(
@@ -198,13 +274,28 @@ async fn native_approval_case(fail: bool, cancel: bool) {
 }
 #[tokio::test]
 async fn native_notice_http_ack_arms_scoped_approval_once() {
-    native_approval_case(false, false).await;
+    native_approval_case(false, false, ThreadMode::Explicit).await;
 }
 #[tokio::test]
 async fn native_notice_http_failure_cancels_without_arming() {
-    native_approval_case(true, false).await;
+    native_approval_case(true, false, ThreadMode::Explicit).await;
 }
 #[tokio::test]
 async fn native_notice_cancellation_before_http_ack_rejects_late_grant() {
-    native_approval_case(false, true).await;
+    native_approval_case(false, true, ThreadMode::Explicit).await;
+}
+
+#[tokio::test]
+async fn native_top_level_notice_accepts_approval_in_displayed_thread() {
+    native_approval_case(false, false, ThreadMode::Synthesized).await;
+}
+
+#[tokio::test]
+async fn native_approval_uses_explicit_thread_even_with_shared_session() {
+    native_approval_case(false, false, ThreadMode::ExplicitWithSharedSession).await;
+}
+
+#[tokio::test]
+async fn native_room_level_notice_keeps_room_level_approval_with_shared_session() {
+    native_approval_case(false, false, ThreadMode::Room).await;
 }
