@@ -119,6 +119,24 @@ From the allowed account in the allowed room:
 Check both the chat and local service diagnostics; silence alone does not prove
 that a denied message never reached a harness. Record unperformed checks honestly.
 
+## Recover after cancellation or an interruption
+
+`/cancel` requests cancellation in the current thread. It cannot undo a tool
+call that already ran or prove that a provider or external service stopped.
+A bridge crash can also interrupt a reply after an action has already happened.
+
+1. Keep the saved thread binding, working directory, and native session history.
+   Do not clear the session or rewind Matrix sync as a recovery step.
+2. Check the actual file, service, or other destination before retrying. An
+   absent chat reply is not proof that the action failed.
+3. Once you know the outcome, continue in the existing thread. Do not resend
+   an instruction with side effects just because its reply is missing.
+
+The native Soulsteads backend's [pending follow-ups](SETUP.md#soulsteads-native-harness-opt-in-acp)
+are held in memory, not restored on restart. See the
+[service guide](MANUAL-SERVICE.md#operate-upgrade-and-remove) for backup and
+restart instructions.
+
 ## Display and conversation choices
 
 This example uses isolated threads. For a dedicated room with unthreaded replies,
