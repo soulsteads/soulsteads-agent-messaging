@@ -90,6 +90,10 @@ option supports approval of supported operations, not every tool. Review the
 selected harness's policy before enabling it; do not grant blanket access to work
 around an unsupported approval flow.
 
+Send `/approve` or `/deny` from the requesting account where the notice appears:
+in its Matrix thread, or at room level if the notice is unthreaded. Approval
+notices stay in an explicit request thread even when `threadIsolation` is off.
+
 ## Build, install, and start
 
 Continue with steps 4–6 of the [service guide](MANUAL-SERVICE.md). Use its Matrix

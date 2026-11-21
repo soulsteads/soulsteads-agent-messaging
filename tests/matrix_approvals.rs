@@ -5,7 +5,7 @@ use soulsteads_messaging::{
     runtime::{Bridge, Event, Sink},
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify};
 
 #[derive(Clone, Default)]
 struct Recorder(Arc<Mutex<Vec<Value>>>);
@@ -61,11 +61,15 @@ impl Fixture {
             .as_object_mut()
             .unwrap()
             .extend(extra.as_object().unwrap().clone());
-        let cfg = config::load(&json!({"rateLimitSeconds":0,"sessionStorePath":root.path().join("store.json"),
+        let mut settings = json!({"rateLimitSeconds":0,"sessionStorePath":root.path().join("store.json"),
             "acp":{"command":"/usr/bin/python3","args":[concat!(env!("CARGO_MANIFEST_DIR"),"/tests/fixtures/matrix-approval-peer.py")],
                 "env":{"APPROVAL_AUDIT":root.path().join("rpc.jsonl"),"APPROVAL_REQUEST":patch.to_string(),"APPROVAL_MODE":mode}},
             "matrix":matrix
-        }).to_string(),&BTreeMap::new()).unwrap();
+        });
+        if mode == "overlap" {
+            settings["toolMessages"] = json!({"mode":"hermes"});
+        }
+        let cfg = config::load(&settings.to_string(), &BTreeMap::new()).unwrap();
         let bridge =
             Arc::new(Bridge::new(cfg, BTreeMap::new(), root.path().join("sessions")).unwrap());
         Self {
@@ -128,6 +132,101 @@ impl Fixture {
             .unwrap();
         self.bridge.shutdown().await.unwrap();
     }
+}
+
+#[derive(Default)]
+struct OverlapSink {
+    recorder: Recorder,
+    send_lock: Mutex<()>,
+    contending: Notify,
+    release_notice: Notify,
+    published: Notify,
+    marker: std::path::PathBuf,
+}
+
+#[async_trait]
+impl Sink for OverlapSink {
+    async fn emit(&self, value: Value) -> anyhow::Result<()> {
+        if value["text"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("Approval required"))
+        {
+            let _guard = self.send_lock.lock().await;
+            std::fs::write(&self.marker, b"")?;
+            self.release_notice.notified().await;
+            self.recorder.emit(value).await?;
+            self.published.notify_one();
+            return Ok(());
+        }
+        if value["type"] == "activity" {
+            assert!(
+                self.send_lock.try_lock().is_err(),
+                "approval must own the send lock"
+            );
+            self.contending.notify_one();
+            let _guard = self.send_lock.lock().await;
+            return self.recorder.emit(value).await;
+        }
+        self.recorder.emit(value).await
+    }
+}
+
+#[tokio::test]
+async fn overlapping_tool_activity_does_not_stall_approval_publication() {
+    let fixture = Fixture::new(json!({}), json!({}), "overlap");
+    let sink = Arc::new(OverlapSink {
+        recorder: fixture.sink.clone(),
+        marker: fixture.root.path().join("rpc.jsonl.publishing"),
+        ..Default::default()
+    });
+    let task = {
+        let bridge = fixture.bridge.clone();
+        let sink = sink.clone();
+        tokio::spawn(async move { bridge.handle(event("work"), sink.as_ref()).await })
+    };
+    let overlap = tokio::time::timeout(Duration::from_secs(5), sink.contending.notified()).await;
+    assert!(
+        fixture.replies().is_empty(),
+        "unpublished notice granted permission"
+    );
+    sink.release_notice.notify_one();
+    let published = tokio::time::timeout(Duration::from_secs(2), sink.published.notified()).await;
+    if overlap.is_err() || published.is_err() {
+        task.abort();
+        let _ = task.await;
+        fixture.bridge.shutdown().await.unwrap();
+        overlap.expect("tool activity did not reach the contested lock");
+        panic!("approval notice could not complete while tool activity waited for the send lock");
+    }
+    let notice = fixture.notice().await;
+    let command = notice
+        .lines()
+        .find(|line| line.starts_with("/approve "))
+        .unwrap();
+    fixture
+        .bridge
+        .handle(event(command), &fixture.sink)
+        .await
+        .unwrap();
+    fixture.finish(task).await;
+    let replies = fixture.replies();
+    assert_eq!(replies.len(), 1);
+    assert_eq!(
+        replies[0]["result"]["outcome"],
+        json!({"outcome":"selected","optionId":"native-once"})
+    );
+    let events = fixture.sink.0.lock().await;
+    let notice = events
+        .iter()
+        .position(|v| {
+            v["text"]
+                .as_str()
+                .is_some_and(|text| text.starts_with("Approval required"))
+        })
+        .unwrap();
+    let activity = events.iter().position(|v| v["type"] == "activity").unwrap();
+    let done = events.iter().position(|v| v["type"] == "done").unwrap();
+    assert!(notice < activity && activity < done);
 }
 
 #[tokio::test]
