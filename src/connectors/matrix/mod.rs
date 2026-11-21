@@ -313,6 +313,11 @@ async fn ensure_plaintext_room(room: &Room) -> Result<()> {
     Ok(())
 }
 impl MatrixSink {
+    fn approval_thread(&self) -> Option<&OwnedEventId> {
+        // A shared session does not erase an explicit decision thread. For a
+        // top-level prompt with isolation on, use its synthesized reply root.
+        self.raw_thread.as_ref().or(self.thread.as_ref())
+    }
     fn reply_key(&self, root: &OwnedEventId) -> String {
         format!("{}:{root}", self.room.room_id())
     }
@@ -451,6 +456,21 @@ impl Sink for MatrixSink {
                 .map(ToString::to_string)
                 .unwrap_or_default(),
         )
+    }
+    fn matrix_approval_thread(&self) -> Option<String> {
+        Some(
+            self.approval_thread()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
+        )
+    }
+    async fn emit_approval_notice(&self, text: String) -> Result<()> {
+        self.send_message_to(
+            RoomMessageEventContent::notice_plain(text),
+            self.approval_thread(),
+        )
+        .await?;
+        Ok(())
     }
     fn matrix_user_id(&self) -> Option<String> {
         self.room.client().user_id().map(ToString::to_string)

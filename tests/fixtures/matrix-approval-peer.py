@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+import time
 
 
 def send(value):
@@ -38,6 +39,17 @@ for line in sys.stdin:
         params.update(json.loads(os.environ.get("APPROVAL_REQUEST", "{}")))
         request = {"jsonrpc": "2.0", "id": 900, "method": "session/request_permission", "params": params}
         send(request)
+        if mode == "overlap":
+            marker = os.environ["APPROVAL_AUDIT"] + ".publishing"
+            deadline = time.monotonic() + 5
+            while not os.path.exists(marker):
+                if time.monotonic() >= deadline:
+                    sys.exit("approval fixture did not enter notice publication")
+                time.sleep(0.005)
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {
+                "sessionId": "approval-session", "update": {"sessionUpdate": "tool_call",
+                "toolCallId": "activity", "kind": "execute", "status": "in_progress",
+                "title": "Bash", "rawInput": {"command": "printf fixture-progress"}}}})
         send({"jsonrpc": "2.0", "method": "session/update", "params": {
             "sessionId": "approval-session", "update": {"sessionUpdate": "agent_message_chunk",
             "content": {"type": "text", "text": "reader-progress"}}}})
