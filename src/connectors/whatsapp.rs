@@ -220,11 +220,20 @@ mod tests {
         waproto::whatsapp as wa,
     };
 
+    // NANP reserves 555-0100 through 555-0199 for fictional use.
+    const FIXTURE_USER: &str = "12025550101";
+    const OTHER_FIXTURE_USER: &str = "12025550102";
+
     fn info(is_from_me: bool, is_group: bool, chat: &str, sender: &str) -> MessageInfo {
+        let chat_domain = if is_group { "g.us" } else { "s.whatsapp.net" };
         MessageInfo {
             source: MessageSource {
-                chat: chat.parse().expect("valid SDK chat JID"),
-                sender: sender.parse().expect("valid SDK sender JID"),
+                chat: format!("{chat}@{chat_domain}")
+                    .parse()
+                    .expect("valid SDK chat JID"),
+                sender: format!("{sender}@s.whatsapp.net")
+                    .parse()
+                    .expect("valid SDK sender JID"),
                 is_from_me,
                 is_group,
                 ..Default::default()
@@ -280,21 +289,16 @@ mod tests {
     fn normalizes_incoming_conversation_text_when_others_are_enabled() {
         let event = event_from_message(
             &conversation("hello"),
-            &info(
-                false,
-                false,
-                "15550000001@s.whatsapp.net",
-                "15550000001@s.whatsapp.net",
-            ),
+            &info(false, false, FIXTURE_USER, FIXTURE_USER),
             true,
         )
         .expect("allowed incoming text maps to an event");
 
         assert_eq!(event.platform, "whatsapp");
-        assert_eq!(event.room, "15550000001@s.whatsapp.net");
+        assert_eq!(event.room, format!("{FIXTURE_USER}@s.whatsapp.net"));
         assert_eq!(event.thread, "");
         assert_eq!(event.id, "message-id");
-        assert_eq!(event.user, "15550000001");
+        assert_eq!(event.user, FIXTURE_USER);
         assert_eq!(event.text, "hello");
         assert!(!event.direct);
         assert!(!event.mentioned);
@@ -316,12 +320,7 @@ mod tests {
 
         let event = event_from_message(
             &message,
-            &info(
-                false,
-                false,
-                "15550000001@s.whatsapp.net",
-                "15550000001@s.whatsapp.net",
-            ),
+            &info(false, false, FIXTURE_USER, FIXTURE_USER),
             true,
         )
         .expect("extended text maps to an event");
@@ -333,12 +332,7 @@ mod tests {
     fn marks_slash_command_text_as_mentioned() {
         let event = event_from_message(
             &conversation("  /help"),
-            &info(
-                false,
-                false,
-                "15550000001@s.whatsapp.net",
-                "15550000001@s.whatsapp.net",
-            ),
+            &info(false, false, FIXTURE_USER, FIXTURE_USER),
             true,
         )
         .expect("allowed command maps to an event");
@@ -350,12 +344,7 @@ mod tests {
     fn maps_outgoing_self_chat_as_direct() {
         let event = event_from_message(
             &conversation("note to self"),
-            &info(
-                true,
-                false,
-                "15550000001@s.whatsapp.net",
-                "15550000001@s.whatsapp.net",
-            ),
+            &info(true, false, FIXTURE_USER, FIXTURE_USER),
             false,
         )
         .expect("self chat is accepted regardless of respondToOthers");
@@ -369,12 +358,7 @@ mod tests {
         assert!(
             event_from_message(
                 &conversation("hello"),
-                &info(
-                    false,
-                    false,
-                    "15550000001@s.whatsapp.net",
-                    "15550000001@s.whatsapp.net"
-                ),
+                &info(false, false, FIXTURE_USER, FIXTURE_USER),
                 false,
             )
             .is_none()
@@ -386,12 +370,7 @@ mod tests {
         assert!(
             event_from_message(
                 &conversation("outbound"),
-                &info(
-                    true,
-                    false,
-                    "15550000002@s.whatsapp.net",
-                    "15550000001@s.whatsapp.net"
-                ),
+                &info(true, false, OTHER_FIXTURE_USER, FIXTURE_USER),
                 true,
             )
             .is_none()
@@ -400,19 +379,9 @@ mod tests {
 
     #[test]
     fn rejects_outgoing_group_even_when_sender_matches_chat_user() {
-        assert!(
-            event_from_message(
-                &conversation("outbound group"),
-                &info(
-                    true,
-                    true,
-                    "120363021033254949@g.us",
-                    "120363021033254949@g.us"
-                ),
-                true,
-            )
-            .is_none()
-        );
+        let group = info(true, true, FIXTURE_USER, FIXTURE_USER);
+        assert_eq!(group.source.chat.user, group.source.sender.user);
+        assert!(event_from_message(&conversation("outbound group"), &group, true).is_none());
     }
 
     #[test]
@@ -420,12 +389,7 @@ mod tests {
         assert!(
             event_from_message(
                 &wa::Message::default(),
-                &info(
-                    false,
-                    false,
-                    "15550000001@s.whatsapp.net",
-                    "15550000001@s.whatsapp.net"
-                ),
+                &info(false, false, FIXTURE_USER, FIXTURE_USER),
                 true,
             )
             .is_none()
@@ -436,12 +400,7 @@ mod tests {
     fn preserves_empty_text_as_an_event() {
         let event = event_from_message(
             &conversation(""),
-            &info(
-                false,
-                false,
-                "15550000001@s.whatsapp.net",
-                "15550000001@s.whatsapp.net",
-            ),
+            &info(false, false, FIXTURE_USER, FIXTURE_USER),
             true,
         )
         .expect("existing mapping accepts empty conversation text");

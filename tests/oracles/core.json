@@ -255,20 +255,20 @@
       "sanitized": "[DOCLIBRARY_DOC]report.pdf[/DOCLIBRARY_DOC]"
     },
     {
-      "text": "File: /home/user/cache/file.png",
+      "text": "File: /srv/fixture/cache/file.png",
       "images": [],
-      "imageClean": "File: /home/user/cache/file.png",
+      "imageClean": "File: /srv/fixture/cache/file.png",
       "docs": [],
-      "docClean": "File: /home/user/cache/file.png",
+      "docClean": "File: /srv/fixture/cache/file.png",
       "sanitized": "File: file.png"
     },
     {
-      "text": "https://host/x and /home/user/file.png",
+      "text": "https://host/x and /srv/fixture/file.png",
       "images": [],
-      "imageClean": "https://host/x and /home/user/file.png",
+      "imageClean": "https://host/x and /srv/fixture/file.png",
       "docs": [],
-      "docClean": "https://host/x and /home/user/file.png",
-      "sanitized": "https://host/x and /home/user/file.png"
+      "docClean": "https://host/x and /srv/fixture/file.png",
+      "sanitized": "https://host/x and /srv/fixture/file.png"
     },
     {
       "text": "[DOCLIBRARY_IMAGE][/DOCLIBRARY_IMAGE]",

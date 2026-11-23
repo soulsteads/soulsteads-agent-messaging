@@ -615,7 +615,10 @@ async fn permission_unsafe_or_ambiguous_operations_cancel_without_preview() {
         "token=fixture-secret".to_string(),
         "echo Bearer fixture-secret".into(),
         "echo ghp_fixture".into(),
-        "echo https://user:pass@host".into(),
+        format!(
+            "echo https://{}@example.test",
+            ["fixture-user", "fixture-pass"].join(":")
+        ),
         "echo \u{001b}hidden".into(),
         "echo \u{202e}hidden".into(),
         "echo \u{200f}hidden".into(),
