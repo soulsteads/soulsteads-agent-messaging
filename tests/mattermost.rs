@@ -503,6 +503,87 @@ async fn resume_opens_only_the_saved_thread_without_prompting() {
 }
 
 #[tokio::test]
+async fn resume_reopens_saved_session_after_backend_disconnect() {
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true,
+        "respondToThreadReplies":true
+    }));
+    let sink = Capture::default();
+    deliver(&bridge, &platform, post("one", "", "!oc hello"), &sink).await;
+    let store = directory.path().join("store.json");
+    let before = std::fs::read(&store).unwrap();
+    let saved: Value = serde_json::from_slice(&before).unwrap();
+    let id = &saved["sessions"][0]["sessionId"];
+    assert!(id.as_str().is_some_and(|id| !id.is_empty()));
+
+    let exit = platform
+        .prepare(&bridge, &post("exit", "one", "!oc exit"))
+        .await
+        .unwrap()
+        .unwrap();
+    bridge
+        .handle(exit, &sink)
+        .await
+        .expect_err("fixture exited");
+    let audit = directory.path().join("rpc.jsonl");
+    let after_exit = std::fs::read_to_string(&audit).unwrap();
+    let last: Value = serde_json::from_str(after_exit.lines().last().unwrap()).unwrap();
+    assert_eq!(last["method"], "session/prompt");
+    assert_eq!(last["params"]["prompt"][0]["text"], "exit");
+
+    sink.0.lock().await.clear();
+    deliver(
+        &bridge,
+        &platform,
+        post("resume", "one", "!oc /resume"),
+        &sink,
+    )
+    .await;
+    assert!(
+        sink.0
+            .lock()
+            .await
+            .iter()
+            .any(|v| v["text"] == "Saved session resumed.")
+    );
+    let after_resume = std::fs::read_to_string(&audit).unwrap();
+    let session_ops: Vec<Value> = after_resume
+        .strip_prefix(&after_exit)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .filter(|v| {
+            v["method"]
+                .as_str()
+                .is_some_and(|m| m.starts_with("session/"))
+        })
+        .collect();
+    assert_eq!(session_ops.len(), 1, "{session_ops:?}");
+    assert!(matches!(
+        session_ops[0]["method"].as_str(),
+        Some("session/load" | "session/resume")
+    ));
+    assert_eq!(&session_ops[0]["params"]["sessionId"], id);
+    assert_eq!(std::fs::read(&store).unwrap(), before);
+
+    sink.0.lock().await.clear();
+    deliver(
+        &bridge,
+        &platform,
+        post("followup", "one", "plain followup"),
+        &sink,
+    )
+    .await;
+    assert!(sink.0.lock().await.iter().any(|v| v["type"] == "response"));
+    let after = std::fs::read_to_string(&audit).unwrap();
+    let prompt: Value = serde_json::from_str(after.lines().last().unwrap()).unwrap();
+    assert_eq!(prompt["method"], "session/prompt");
+    assert_eq!(&prompt["params"]["sessionId"], id);
+    assert_eq!(prompt["params"]["prompt"][0]["text"], "plain followup");
+    bridge.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn resume_does_not_launch_or_change_bindings_for_another_thread_or_invalid_arguments() {
     let (directory, bridge, platform) = fixture(json!({
         "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true

@@ -2774,7 +2774,11 @@ impl Bridge {
                 let Some(saved) = self.store.get(&event.platform, context, &backend)? else {
                     return sink.emit(json!({"type":"response","text":"No saved session is bound to this thread."})).await;
                 };
-                if let Some(client) = &state.client {
+                if let Some(client) = state
+                    .client
+                    .as_ref()
+                    .filter(|client| !client.acp_transport_closed())
+                {
                     if state.backend != backend
                         || client.session_id().await.as_deref() != Some(saved.session_id.as_str())
                     {

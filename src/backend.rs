@@ -93,6 +93,9 @@ impl Client {
     pub fn accepts_followups(&self) -> bool {
         dispatch!(self, accepts_followups)
     }
+    pub(crate) fn acp_transport_closed(&self) -> bool {
+        matches!(self, Self::Acp(client) if client.transport_closed())
+    }
     pub async fn session_id(&self) -> Option<String> {
         dispatch_async!(self, session_id)
     }
