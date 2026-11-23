@@ -220,6 +220,27 @@ async fn start() -> Result<()> {
         }
         Ok(())
     });
+    #[cfg(feature = "agent-network")]
+    if configuration["agentMessaging"]["tools"]["reviewQueueDir"].is_string() {
+        let review_bridge = bridge.clone();
+        let mut review_shutdown = receiver.clone();
+        tasks.spawn(async move {
+            let mut poll = tokio::time::interval(Duration::from_secs(1));
+            poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    _ = review_shutdown.changed() => break,
+                    _ = poll.tick() => {
+                        tokio::select! {
+                            _ = review_shutdown.changed() => break,
+                            result = review_bridge.poll_agent_reviews() => result?,
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
+    }
     let result = supervise(
         &bridge,
         &environment,

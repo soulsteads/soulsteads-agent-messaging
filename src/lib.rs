@@ -12,6 +12,7 @@ pub use adapters::opencode::native_client;
 pub use adapters::opencode::native_events;
 pub use adapters::opencode::native_queue;
 pub use adapters::opencode::native_server;
+mod private_journal;
 mod profile;
 pub mod runtime;
 pub mod store;

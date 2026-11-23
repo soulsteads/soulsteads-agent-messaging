@@ -2,6 +2,8 @@ mod admission;
 #[cfg(feature = "agent-network")]
 pub mod agent_tools;
 mod local;
+#[cfg(feature = "agent-network")]
+pub(crate) mod reviews;
 mod types;
 
 pub use local::{

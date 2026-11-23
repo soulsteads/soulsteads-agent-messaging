@@ -11,6 +11,7 @@ pub(crate) struct ConfiguredOwner {
     pub context: String,
     pub backend: String,
     pub allowed_senders: BTreeSet<AgentId>,
+    pub accept_queued_reviews: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -68,6 +69,15 @@ impl AdmissionConfig {
                     "agentMessaging allowed sender",
                 )?);
             }
+            let accept_queued_reviews = object
+                .get("acceptQueuedReviews")
+                .map(|value| {
+                    value
+                        .as_bool()
+                        .ok_or_else(|| anyhow::anyhow!("acceptQueuedReviews must be a boolean"))
+                })
+                .transpose()?
+                .unwrap_or(false);
             let configured = ConfiguredOwner {
                 agent: agent.clone(),
                 name,
@@ -75,6 +85,7 @@ impl AdmissionConfig {
                 context: context.clone(),
                 backend,
                 allowed_senders,
+                accept_queued_reviews,
             };
             if result.owners.insert(agent.clone(), configured).is_some() {
                 bail!("agentMessaging owner is duplicated");
@@ -105,6 +116,20 @@ impl AdmissionConfig {
 
     pub(crate) fn owner(&self, agent: &AgentId) -> Option<&ConfiguredOwner> {
         self.owners.get(agent)
+    }
+}
+
+#[cfg(feature = "agent-network")]
+impl ConfiguredOwner {
+    pub(super) fn review_participant(&self) -> super::reviews::Participant {
+        use sha2::{Digest, Sha256};
+
+        let identity = serde_json::to_vec(&(&self.platform, &self.context, &self.backend))
+            .expect("a tuple of strings always serializes");
+        super::reviews::Participant {
+            id: self.agent.as_str().to_owned(),
+            scope: format!("{:x}", Sha256::digest(identity)),
+        }
     }
 }
 
