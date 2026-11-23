@@ -9,6 +9,75 @@ systems need an equivalent process manager. No administrator privileges or publi
 inbound bridge endpoint are required by this procedure. Your host must be able to
 reach the messaging server and the services used by your harness.
 
+## Multiple connectors, one agent
+
+Use one config file, one `soulsteads-messaging --serve` process, and one unit.
+The process starts every connector whose top-level `enabled` is `true`. Use the
+SDK-enabled build in step 4 if any enabled connector needs Matrix or WhatsApp;
+Telegram and Mattermost can run in the same build. A Mattermost-only setup can
+still use the smaller `--no-default-features` build.
+
+For a fresh instance, choose a name such as `helper` in step 3. This example
+uses an unencrypted Matrix room. Replace all sample IDs and URLs with yours:
+
+```json
+{
+  "acp": { "defaultBackend": "codex" },
+  "trigger": "!agent",
+  "sessionStorePath": "../state/chat-sessions.json",
+  "telegram": {
+    "enabled": true,
+    "token": "{env:TELEGRAM_BOT_TOKEN}",
+    "allowedUsers": ["123456789"]
+  },
+  "mattermost": {
+    "enabled": true,
+    "url": "https://chat.example.org",
+    "token": "{env:MATTERMOST_TOKEN}",
+    "allowedUsers": ["mattermost-user-id"],
+    "allowedChannels": ["mattermost-channel-id"]
+  },
+  "matrix": {
+    "enabled": true,
+    "homeserver": "https://matrix.example.org",
+    "userId": "@bot:example.org",
+    "accessToken": "{env:MATRIX_ACCESS_TOKEN}",
+    "triggerPatterns": ["!agent "],
+    "allowedUsers": ["@person:example.org"],
+    "allowedRooms": ["!room:example.org"],
+    "strictAllowedRooms": true,
+    "encryption": { "enabled": false }
+  }
+}
+```
+
+Supply distinct platform credentials in the unit's private environment file.
+Keep one active consumer per bot/account: don't start a second Telegram poller
+or point an already running Matrix client at this instance's SDK store. For an
+existing installation, review how to retain each connector's session bindings
+and state before consolidating units; copying one store over the others does
+not merge them.
+
+The enabled connectors share the configured agent home, backend defaults, and
+process lifetime. Users, rooms, replies, and conversation sessions remain
+platform-scoped. This is not a cross-platform shared transcript, and a service
+restart affects all its connectors. A connector that fails fatally can bring
+this whole process down; keep separate units if that failure isolation matters.
+
+### Future: multiple agent profiles
+
+A future service can host named profiles by giving each profile its own Bridge,
+agent home, backend settings, and state paths. Connectors should bind to one
+profile explicitly at first. Keep account ownership with the service so a
+shared bot, if later supported, has one connection and routes by an explicit
+account-and-conversation rule. Unmatched or ambiguous routes must not fall
+through to another profile. Sessions, approvals, queued work, and delivery
+receipts must stay with their owning profile; do not automatically import
+legacy state into a newly named profile. In-process profiles would organize
+configuration and state, not sandbox mutually untrusted agents.
+
+Multiple named profiles and profile routing are not available today.
+
 ## 1. Check prerequisites and ownership
 
 - Install Git, Rust/Cargo, and the harness you intend to use. Authenticate that
@@ -73,7 +142,8 @@ configuration, or silently fall back to another identity when preparation fails.
 
 ## 3. Create private directories
 
-Use a separate installation name for each connector. Choose **one**:
+Choose one instance name for the service. Use `matrix` or `mattermost` for a
+standalone connector, or a distinct name such as `helper` for a combined service:
 
 ```sh
 INSTANCE=matrix
@@ -120,7 +190,7 @@ process environment variables take precedence, and nonempty platform
 From the source checkout, select the command for your connector:
 
 ```sh
-# Matrix without encryption: includes the platform SDKs.
+# SDK-enabled: required when Matrix or WhatsApp is enabled, including combined services.
 cargo build --release --locked --no-default-features --features platform-sdks --bin soulsteads-messaging
 ```
 
@@ -147,8 +217,8 @@ state let you operate Matrix and Mattermost independently.
 
 ## 5. Install the unit without starting it
 
-Create `~/.config/systemd/user/soulsteads-messaging-matrix.service`, or use the
-`mattermost` name for that connector. Create the parent directory if absent.
+Create `~/.config/systemd/user/$UNIT` with the instance name chosen above.
+Create the parent directory if absent.
 The following is a template: replace **every** `INSTANCE` with your chosen name,
 and replace `HARNESS_BIN_DIR` with the absolute directory containing your native
 CLI. Include other tool directories only if needed and trusted.
@@ -205,9 +275,10 @@ journalctl --user -u "$UNIT" -n 50 --no-pager
 ```
 
 Keep diagnostics private and redact them before sharing. Check that the selected
-binary is running, the connector has authenticated as the expected bot, and the
-service is not repeatedly restarting. Then run the platform guide's real-message
-checks. A process can be active without a working platform/harness connection.
+binary is running, each enabled connector has authenticated as the expected bot,
+and the service is not repeatedly restarting. Then run the real-message checks
+for each connector. Use the [Telegram guide](SETUP.md#telegram) if enabled. A
+process can be active without a working platform/harness connection.
 If startup fails repeatedly, stop the exact unit and investigate before retrying.
 
 After successful acceptance, enable startup with the user manager if desired:
@@ -268,8 +339,8 @@ another connector's data. Revoke the dedicated bot token when retiring the accou
 - **No reply:** check bot membership, exact sender and room/channel IDs, environment
   overrides, triggers, and harness/provider access. Do not empty allowlists as a fix.
 - **WebSocket or TLS failure:** verify certificates and proxy/WebSocket support.
-  Do not disable certificate verification. For Mattermost, use the documented
-  no-default-features binary rather than an unnecessary SDK-enabled bundle.
+  Do not disable certificate verification. Use an SDK-enabled build for a service
+  that includes Matrix or WhatsApp.
 - **No resume after restart:** preserve bindings and native state, keep their paths
   stable, and follow the platform's explicit-addressing instructions.
 

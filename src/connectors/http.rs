@@ -602,9 +602,24 @@ impl Platform {
             }
             _ => bail!("Unknown socket connector"),
         };
-        let (mut socket, _) = tokio_tungstenite::connect_async(address)
-            .await
-            .map_err(|_| anyhow::anyhow!("Platform WebSocket connection failed"))?;
+        // Matrix brings AWS-LC and the HTTP client brings ring. Choose the
+        // WebSocket provider locally rather than relying on either connector
+        // to initialize a process-wide provider before another connects.
+        let roots: rustls::RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
+        let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+        let (mut socket, _) = tokio_tungstenite::connect_async_tls_with_config(
+            address,
+            None,
+            false,
+            Some(tokio_tungstenite::Connector::Rustls(Arc::new(tls))),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Platform WebSocket connection failed"))?;
         if self.kind == "mattermost" {
             socket.send(json!({"seq":1,"action":"authentication_challenge","data":{"token":self.token}}).to_string().into()).await?;
         }
@@ -656,6 +671,57 @@ impl Platform {
                 }
             }
         }
+    }
+}
+
+#[cfg(all(test, feature = "platform-sdks"))]
+mod tls_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use tokio::io::AsyncReadExt;
+
+    #[tokio::test]
+    async fn mattermost_websocket_starts_tls_in_a_matrix_enabled_build() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = crate::config::defaults();
+        config["sessionStorePath"] = serde_json::json!(directory.path().join("store.json"));
+        let bridge = Arc::new(
+            Bridge::new(config, BTreeMap::new(), directory.path().join("sessions")).unwrap(),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("https://{}", listener.local_addr().unwrap());
+        let platform = Platform::new("mattermost", &base, "fixture", "bot", "bot");
+        let (_stop, mut shutdown) = watch::channel(false);
+        let mut tasks = tokio::task::JoinSet::new();
+        let capacity = Arc::new(Semaphore::new(1));
+        let mut session_id = String::new();
+        let mut sequence = Value::Null;
+        let witness = async {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut header = [0; 6];
+            stream.read_exact(&mut header).await.unwrap();
+            assert_eq!(
+                header[0], 22,
+                "TLS handshake record, not a plain HTTP upgrade"
+            );
+            assert_eq!(header[5], 1, "TLS ClientHello");
+        };
+        let (result, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(
+                platform.socket_once(
+                    bridge,
+                    &mut shutdown,
+                    &capacity,
+                    &mut tasks,
+                    &mut session_id,
+                    &mut sequence
+                ),
+                witness
+            )
+        })
+        .await
+        .unwrap();
+        assert!(result.is_err(), "the fixture never completes the handshake");
     }
 }
 

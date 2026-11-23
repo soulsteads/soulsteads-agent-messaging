@@ -18,7 +18,42 @@ fn update(session: &str, kind: &str, content: Value) {
         json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":session,"update":{"sessionUpdate":kind,"content":content}}}),
     );
 }
+// Keep the default fixture's fixed session and scripted replies unchanged.
+fn echo_prompt() {
+    let mut sessions = std::collections::HashSet::new();
+    for line in io::stdin().lock().lines() {
+        let request: Value = serde_json::from_str(&line.unwrap()).unwrap();
+        let id = &request["id"];
+        let result = match request["method"].as_str() {
+            Some("initialize") => {
+                json!({"protocolVersion":1,"agentInfo":{"name":"echo-fixture"}})
+            }
+            Some("session/new") => {
+                let session = uuid::Uuid::new_v4().to_string();
+                sessions.insert(session.clone());
+                json!({"sessionId":session})
+            }
+            Some("session/prompt") => {
+                let session = request["params"]["sessionId"].as_str().unwrap();
+                assert!(sessions.contains(session));
+                let prompt = request["params"]["prompt"][0]["text"].as_str().unwrap();
+                update(
+                    session,
+                    "agent_message_chunk",
+                    json!({"type":"text","text":format!("{prompt} via {session}")}),
+                );
+                json!({"stopReason":"end_turn"})
+            }
+            _ => continue,
+        };
+        send(json!({"id":id,"result":result}));
+    }
+}
 fn main() {
+    if std::env::args().any(|arg| arg == "--echo-prompt") {
+        echo_prompt();
+        return;
+    }
     if std::env::args().any(|arg| arg == "--adapter-live-mcp") {
         live_mcp_stdio::run();
         return;

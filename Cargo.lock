@@ -4446,6 +4446,7 @@ dependencies = [
  "qrcode",
  "regex",
  "reqwest 0.12.28",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4454,6 +4455,7 @@ dependencies = [
  "tokio-tungstenite 0.28.0",
  "url",
  "uuid",
+ "webpki-roots 0.26.11",
  "whatsapp-rust",
  "whatsapp-rust-sqlite-storage",
 ]
