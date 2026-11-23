@@ -144,6 +144,7 @@ pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String
 /// must never accidentally expose a native harness to every chat participant.
 pub fn validate_connector_access(config: &Value, env: &BTreeMap<String, String>) -> Result<()> {
     mattermost_receipt_dir(config)?;
+    crate::connectors::telegram::skill_reviews::settings(config)?;
     for platform in [
         "matrix",
         "mattermost",
