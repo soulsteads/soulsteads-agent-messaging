@@ -19,7 +19,7 @@ impl Sink for Capture {
 }
 fn fixture(mm: Value) -> (tempfile::TempDir, Bridge, Platform) {
     let directory = tempfile::tempdir().unwrap();
-    let config = config::load(&json!({"rateLimitSeconds":0,"mattermost":mm,"sessionStorePath":directory.path().join("store.json"),"acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[]}}).to_string(), &BTreeMap::new()).unwrap();
+    let config = config::load(&json!({"rateLimitSeconds":0,"mattermost":mm,"sessionStorePath":directory.path().join("store.json"),"acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":[],"env":{"ACP_FIXTURE_RPC_AUDIT":directory.path().join("rpc.jsonl")}}}).to_string(), &BTreeMap::new()).unwrap();
     let bridge = Bridge::new(config, BTreeMap::new(), directory.path().join("sessions")).unwrap();
     (
         directory,
@@ -273,6 +273,345 @@ async fn persisted_thread_after_restart_requires_explicit_addressing() {
     .await;
     assert!(sink.0.lock().await.iter().any(|v| v["type"] == "response"));
     restarted.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn cancel_does_not_open_a_saved_thread() {
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true
+    }));
+    let sink = Capture::default();
+    deliver(&bridge, &platform, post("root", "", "!oc hello"), &sink).await;
+    let config = bridge.config.clone();
+    bridge.shutdown().await.unwrap();
+    let restarted =
+        Bridge::new(config, BTreeMap::new(), directory.path().join("sessions")).unwrap();
+    assert!(
+        restarted
+            .has_persisted("mattermost", "channel:root")
+            .unwrap()
+    );
+    let audit = directory.path().join("rpc.jsonl");
+    let before = std::fs::read(&audit).unwrap();
+    let store = directory.path().join("store.json");
+    let saved = std::fs::read(&store).unwrap();
+    sink.0.lock().await.clear();
+    deliver(
+        &restarted,
+        &platform,
+        post("cancel", "root", "!oc /cancel"),
+        &sink,
+    )
+    .await;
+    restarted.shutdown().await.unwrap();
+    assert!(
+        sink.0
+            .lock()
+            .await
+            .iter()
+            .any(|v| v["text"] == "No open session in this thread.")
+    );
+    assert_eq!(
+        std::fs::read(audit).unwrap(),
+        before,
+        "an unopened thread received a backend RPC"
+    );
+    assert_eq!(std::fs::read(store).unwrap(), saved);
+}
+
+#[tokio::test]
+async fn cancel_targets_only_the_active_thread_and_takes_no_arguments() {
+    use std::time::Duration;
+
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true
+    }));
+    let audit = directory.path().join("rpc.jsonl");
+    let prompt_sink = Capture::default();
+    let control_sink = Capture::default();
+    let prompt = deliver(
+        &bridge,
+        &platform,
+        post("root", "", "!oc wait"),
+        &prompt_sink,
+    );
+    let controls = async {
+        loop {
+            if std::fs::read_to_string(&audit).is_ok_and(|log| {
+                log.lines().any(|line| {
+                    serde_json::from_str::<Value>(line)
+                        .is_ok_and(|v| v["method"] == "session/prompt")
+                })
+            }) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        deliver(
+            &bridge,
+            &platform,
+            post("foreign", "other", "!oc /cancel"),
+            &control_sink,
+        )
+        .await;
+        let unauthorized = json!({"event":"posted","data":{"post":json!({
+            "id":"denied","root_id":"root","channel_id":"channel","user_id":"denied","message":"!oc /cancel"
+        }).to_string(),"channel_type":"P"}});
+        deliver(&bridge, &platform, unauthorized, &control_sink).await;
+        deliver(
+            &bridge,
+            &platform,
+            post("with-arg", "root", "!oc /cancel other"),
+            &control_sink,
+        )
+        .await;
+        let cancel = post("cancel", "root", "!oc /cancel");
+        deliver(&bridge, &platform, cancel.clone(), &control_sink).await;
+        deliver(&bridge, &platform, cancel, &control_sink).await;
+    };
+    let outcome = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(prompt, controls);
+    })
+    .await;
+    bridge.shutdown().await.unwrap();
+    outcome.expect("the active ACP prompt did not settle");
+    let values = control_sink.0.lock().await;
+    let messages: Vec<_> = values.iter().filter_map(|v| v["text"].as_str()).collect();
+    assert_eq!(
+        messages,
+        [
+            "No open session in this thread.",
+            "Usage: /cancel (without arguments).",
+            "Cancellation requested."
+        ]
+    );
+    assert!(
+        prompt_sink
+            .0
+            .lock()
+            .await
+            .iter()
+            .any(|v| v["text"] == "Request cancelled.")
+    );
+    let calls: Vec<Value> = std::fs::read_to_string(audit)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let prompt = calls
+        .iter()
+        .find(|v| v["method"] == "session/prompt")
+        .unwrap();
+    let cancels: Vec<_> = calls
+        .iter()
+        .filter(|v| v["method"] == "session/cancel")
+        .collect();
+    assert_eq!(cancels.len(), 1);
+    assert_eq!(
+        cancels[0]["params"]["sessionId"],
+        prompt["params"]["sessionId"]
+    );
+}
+
+#[tokio::test]
+async fn resume_opens_only_the_saved_thread_without_prompting() {
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true,
+        "respondToThreadReplies":true
+    }));
+    let sink = Capture::default();
+    deliver(&bridge, &platform, post("one", "", "!oc hello"), &sink).await;
+    let store = directory.path().join("store.json");
+    let before = std::fs::read(&store).unwrap();
+    let saved = serde_json::from_slice::<Value>(&before).unwrap();
+    let id = &saved["sessions"][0]["sessionId"];
+    let config = bridge.config.clone();
+    bridge.shutdown().await.unwrap();
+    let audit = directory.path().join("rpc.jsonl");
+    std::fs::write(&audit, "").unwrap();
+    let restarted =
+        Bridge::new(config, BTreeMap::new(), directory.path().join("sessions")).unwrap();
+
+    sink.0.lock().await.clear();
+    deliver(
+        &restarted,
+        &platform,
+        post("status", "one", "!oc /status"),
+        &sink,
+    )
+    .await;
+    assert!(sink.0.lock().await.iter().any(|v| v["text"] == "This thread has a saved session. Address the bot with /resume to reopen it without starting a prompt."));
+    assert!(std::fs::read_to_string(&audit).unwrap().is_empty());
+    sink.0.lock().await.clear();
+    deliver(
+        &restarted,
+        &platform,
+        post("resume", "one", "!oc /resume"),
+        &sink,
+    )
+    .await;
+    assert!(
+        sink.0
+            .lock()
+            .await
+            .iter()
+            .any(|v| v["text"] == "Saved session resumed.")
+    );
+    assert_eq!(std::fs::read(&store).unwrap(), before);
+    let resumed = std::fs::read_to_string(&audit).unwrap();
+    let requests: Vec<Value> = resumed
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let session_ops: Vec<_> = requests
+        .iter()
+        .filter(|v| {
+            v["method"]
+                .as_str()
+                .is_some_and(|method| method.starts_with("session/"))
+        })
+        .collect();
+    assert_eq!(session_ops.len(), 1, "{session_ops:?}");
+    assert!(matches!(
+        session_ops[0]["method"].as_str(),
+        Some("session/load" | "session/resume")
+    ));
+    assert_eq!(&session_ops[0]["params"]["sessionId"], id);
+
+    deliver(
+        &restarted,
+        &platform,
+        post("repeat", "one", "!oc /resume"),
+        &sink,
+    )
+    .await;
+    assert_eq!(std::fs::read_to_string(&audit).unwrap(), resumed);
+    sink.0.lock().await.clear();
+    deliver(
+        &restarted,
+        &platform,
+        post("followup", "one", "plain followup"),
+        &sink,
+    )
+    .await;
+    assert!(sink.0.lock().await.iter().any(|v| v["type"] == "response"));
+    let after = std::fs::read_to_string(&audit).unwrap();
+    let prompt: Value = serde_json::from_str(after.lines().last().unwrap()).unwrap();
+    assert_eq!(prompt["method"], "session/prompt");
+    assert_eq!(&prompt["params"]["sessionId"], id);
+    restarted.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn resume_does_not_launch_or_change_bindings_for_another_thread_or_invalid_arguments() {
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true
+    }));
+    let sink = Capture::default();
+    deliver(&bridge, &platform, post("one", "", "!oc hello"), &sink).await;
+    let store = directory.path().join("store.json");
+    let saved = std::fs::read(&store).unwrap();
+    let config = bridge.config.clone();
+    bridge.shutdown().await.unwrap();
+    let audit = directory.path().join("rpc.jsonl");
+    std::fs::write(&audit, "").unwrap();
+    let restarted = Bridge::new(
+        config.clone(),
+        BTreeMap::new(),
+        directory.path().join("sessions"),
+    )
+    .unwrap();
+    for (event, expected) in [
+        (
+            post("none", "other", "!oc /resume"),
+            "No saved session is bound to this thread.",
+        ),
+        (
+            post("args", "one", "!oc /resume another-session"),
+            "Usage: /resume (without a session ID).",
+        ),
+    ] {
+        sink.0.lock().await.clear();
+        deliver(&restarted, &platform, event, &sink).await;
+        assert!(sink.0.lock().await.iter().any(|v| v["text"] == expected));
+    }
+    let mut denied = post("denied", "one", "!oc /resume");
+    let mut content: Value =
+        serde_json::from_str(denied["data"]["post"].as_str().unwrap()).unwrap();
+    content["user_id"] = json!("intruder");
+    denied["data"]["post"] = json!(content.to_string());
+    assert!(
+        platform
+            .prepare(&restarted, &denied)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    restarted.shutdown().await.unwrap();
+    let mut nonisolated = config;
+    nonisolated["mattermost"]["threadIsolation"] = json!(false);
+    let restarted = Bridge::new(
+        nonisolated,
+        BTreeMap::new(),
+        directory.path().join("sessions"),
+    )
+    .unwrap();
+    sink.0.lock().await.clear();
+    deliver(
+        &restarted,
+        &platform,
+        post("unisolated", "one", "!oc /resume"),
+        &sink,
+    )
+    .await;
+    assert!(
+        sink.0
+            .lock()
+            .await
+            .iter()
+            .any(|v| v["text"] == "Resume requires an isolated Mattermost thread.")
+    );
+    restarted.shutdown().await.unwrap();
+    assert_eq!(std::fs::read(store).unwrap(), saved);
+    assert!(std::fs::read_to_string(audit).unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn resume_refuses_a_changed_backend_identity_without_starting_it() {
+    let (directory, bridge, platform) = fixture(json!({
+        "allowedChannels":["channel"],"allowedUsers":["human"],"threadIsolation":true
+    }));
+    let sink = Capture::default();
+    deliver(&bridge, &platform, post("one", "", "!oc hello"), &sink).await;
+    let store = directory.path().join("store.json");
+    let saved = std::fs::read(&store).unwrap();
+    let mut config = bridge.config.clone();
+    config["acp"]["backendId"] = json!("different-binding");
+    bridge.shutdown().await.unwrap();
+    let audit = directory.path().join("rpc.jsonl");
+    std::fs::write(&audit, "").unwrap();
+    let restarted =
+        Bridge::new(config, BTreeMap::new(), directory.path().join("sessions")).unwrap();
+    let event = platform
+        .prepare(&restarted, &post("resume", "one", "!oc /resume"))
+        .await
+        .unwrap()
+        .unwrap();
+    let error = restarted.handle(event, &sink).await.unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("Stored backend identity or workspace differs")
+    );
+    assert!(
+        !restarted
+            .has_active_session("mattermost", "channel:one")
+            .await
+            .unwrap()
+    );
+    restarted.shutdown().await.unwrap();
+    assert_eq!(std::fs::read(store).unwrap(), saved);
+    assert!(std::fs::read_to_string(audit).unwrap().is_empty());
 }
 
 #[tokio::test]

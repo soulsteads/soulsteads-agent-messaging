@@ -206,9 +206,10 @@ impl Platform {
                 if body["type"].as_str().is_some_and(|kind| !kind.is_empty()) {
                     return None;
                 }
-                event.room = scalar(&body["channel_id"]);
-                event.user = scalar(&body["user_id"]);
-                event.id = format!("{}:{}", event.room, scalar(&body["id"]));
+                event.room = body["channel_id"].as_str()?.into();
+                event.user = body["user_id"].as_str()?.into();
+                let post_id = body["id"].as_str().filter(|id| !id.is_empty())?;
+                event.id = format!("{}:{post_id}", event.room);
                 event.thread = body["root_id"]
                     .as_str()
                     .filter(|value| !value.is_empty())
@@ -692,6 +693,80 @@ impl PlatformSink {
 }
 #[async_trait]
 impl Sink for PlatformSink {
+    fn mattermost_receipt_identity(&self, event: &Event) -> Option<String> {
+        if self.platform.kind != "mattermost"
+            || !self.activity_threaded
+            || !crate::mattermost_receipts::valid_id(&self.platform.bot)
+            || self.event.id != event.id
+            || self.event.room != event.room
+            || self.event.thread != event.thread
+            || self.event.user != event.user
+        {
+            return None;
+        }
+        let url = url::Url::parse(&self.platform.url("posts").ok()?).ok()?;
+        if url.query().is_some() || url.fragment().is_some() {
+            return None;
+        }
+        Some(format!("{url}\0{}", self.platform.bot))
+    }
+
+    async fn deliver_mattermost_reply(
+        &self,
+        text: &str,
+        before_first_post: &mut (dyn FnMut() -> Result<()> + Send),
+    ) -> Result<Vec<String>> {
+        self.mattermost_receipt_identity(&self.event)
+            .context("Invalid Mattermost final reply destination")?;
+        let url = self.platform.url("posts")?;
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .retry(reqwest::retry::never())
+            .timeout(Duration::from_secs(40))
+            .build()?;
+        let mut ids = Vec::new();
+        for text in split(text, 3900) {
+            let request = self
+                .platform
+                .authorize(client.post(&url).json(&json!({
+                    "channel_id": self.event.room,
+                    "root_id": self.event.thread,
+                    "message": text,
+                })))
+                .build()?;
+            if ids.is_empty() {
+                before_first_post()?;
+            }
+            let response = client
+                .execute(request)
+                .await
+                .map_err(|_| anyhow::anyhow!("Mattermost reply POST not acknowledged"))?;
+            if !response.status().is_success() {
+                bail!(
+                    "Mattermost reply POST not acknowledged ({})",
+                    response.status().as_u16()
+                );
+            }
+            let body = read_json(response).await?;
+            if body["channel_id"] != self.event.room
+                || body["root_id"] != self.event.thread
+                || body["user_id"] != self.platform.bot
+                || body["message"] != text
+            {
+                bail!("Mattermost reply acknowledgement did not match the post");
+            }
+            let id = body["id"]
+                .as_str()
+                .filter(|id| crate::mattermost_receipts::valid_id(id))
+                .context("Missing Mattermost reply post ID")?;
+            if ids.iter().any(|previous| previous == id) {
+                bail!("Duplicate Mattermost reply post ID");
+            }
+            ids.push(id.to_owned());
+        }
+        Ok(ids)
+    }
+
     fn owned(&self) -> Option<Arc<dyn Sink>> {
         Some(Arc::new(
             Self::new(self.platform.clone(), self.event.clone())

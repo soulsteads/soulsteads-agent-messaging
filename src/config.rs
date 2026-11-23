@@ -143,6 +143,7 @@ pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String
 /// Refuse ambiguous remote access at the service boundary. An empty allowlist
 /// must never accidentally expose a native harness to every chat participant.
 pub fn validate_connector_access(config: &Value, env: &BTreeMap<String, String>) -> Result<()> {
+    mattermost_receipt_dir(config)?;
     for platform in [
         "matrix",
         "mattermost",
@@ -165,6 +166,21 @@ pub fn validate_connector_access(config: &Value, env: &BTreeMap<String, String>)
         }
     }
     Ok(())
+}
+
+pub(crate) fn mattermost_receipt_dir(config: &Value) -> Result<Option<&std::path::Path>> {
+    let Some(dir) = config["mattermost"].get("turnReceiptDir") else {
+        return Ok(None);
+    };
+    let path = dir
+        .as_str()
+        .map(std::path::Path::new)
+        .filter(|path| path.is_absolute())
+        .ok_or_else(|| anyhow::anyhow!("mattermost.turnReceiptDir must be an absolute path"))?;
+    if config["mattermost"]["threadIsolation"] != true {
+        bail!("mattermost.turnReceiptDir requires threadIsolation=true");
+    }
+    Ok(Some(path))
 }
 
 pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
