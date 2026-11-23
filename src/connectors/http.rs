@@ -946,7 +946,7 @@ fn split(text: &str, limit: usize) -> Vec<String> {
     }
     output
 }
-async fn read_json(response: reqwest::Response) -> Result<Value> {
+pub(super) async fn read_json(response: reqwest::Response) -> Result<Value> {
     if response.status().as_u16() == 204 {
         return Ok(Value::Null);
     }

@@ -5,6 +5,7 @@
 
 pub(crate) mod inbound;
 pub(crate) mod outbound;
+pub(crate) mod skill_reviews;
 
 use crate::{
     connectors::http::{Platform, PlatformSink},
@@ -21,6 +22,33 @@ pub(crate) async fn poll(
     shutdown: &mut watch::Receiver<bool>,
     capacity: &Arc<Semaphore>,
     tasks: &mut tokio::task::JoinSet<()>,
+) -> Result<()> {
+    let reviews = skill_reviews::settings(&bridge.config)?
+        .map(skill_reviews::SkillReviews::new)
+        .transpose()?
+        .map(Arc::new);
+    let notices = reviews.clone();
+    let notice_shutdown = shutdown.clone();
+    let notice_platform = platform.clone();
+    let notice_bridge = bridge.clone();
+    tokio::select! {
+        result = poll_updates(platform, bridge, shutdown, capacity, tasks, reviews) => result,
+        _ = async {
+            match notices {
+                Some(reviews) => reviews.notices(&notice_platform, &notice_bridge, notice_shutdown).await,
+                None => std::future::pending::<()>().await,
+            }
+        } => Ok(()),
+    }
+}
+
+async fn poll_updates(
+    platform: Platform,
+    bridge: Arc<Bridge>,
+    shutdown: &mut watch::Receiver<bool>,
+    capacity: &Arc<Semaphore>,
+    tasks: &mut tokio::task::JoinSet<()>,
+    reviews: Option<Arc<skill_reviews::SkillReviews>>,
 ) -> Result<()> {
     // Keep one bounded lane for approvals so 64 permission-waiting
     // prompts cannot prevent their own approval or denial.
@@ -60,6 +88,35 @@ pub(crate) async fn poll(
             Ok(updates) => {
                 failures = 0;
                 for update in updates.as_array().into_iter().flatten() {
+                    if let Some(reviews) = &reviews
+                        && let Some(event) = inbound::map(&platform, update)
+                        && skill_reviews::is_control(&event)
+                    {
+                        if let Some(id) = update["update_id"].as_i64() {
+                            offset = offset.max(id.saturating_add(1));
+                        }
+                        if !reviews.permits(&bridge, &event) {
+                            continue;
+                        }
+                        let reviews = reviews.clone();
+                        let platform = platform.clone();
+                        let bridge = bridge.clone();
+                        let permit = tokio::select! {
+                            _ = shutdown.changed() => break 'telegram,
+                            permit = controls.clone().acquire_owned() => permit.expect("Telegram control semaphore remains open"),
+                        };
+                        tasks.spawn(async move {
+                            let _permit = permit;
+                            reviews.handle(&platform, &bridge, event).await;
+                        });
+                        continue;
+                    }
+                    if reviews.as_ref().is_some_and(|reviews| reviews.reviews_only) {
+                        if let Some(id) = update["update_id"].as_i64() {
+                            offset = offset.max(id.saturating_add(1));
+                        }
+                        continue;
+                    }
                     let control = inbound::map(&platform, update)
                         .is_some_and(|event| crate::runtime::telegram_approval_control(&event));
                     let permit = if control {

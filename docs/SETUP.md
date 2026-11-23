@@ -248,6 +248,8 @@ of `cargo test --locked`.
 
 ## Telegram
 
+For optional Skillstore approval messages, see the [Telegram review inbox](SKILL-REVIEWS.md).
+
 The guided setup builds a new bridge on Linux using Claude Code or Codex and runs
 it as a systemd user service.
 
