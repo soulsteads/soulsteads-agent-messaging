@@ -56,6 +56,8 @@ See [local agent tools](docs/AGENT-TOOLS.md) and [API qualification limits](docs
 
 ## Get started
 
+Prefer Docker or Podman? See the [container deployment guide](docs/containers.md).
+
 ### The easy way: ask your agent
 
 Setting this up is a conversation, not a project. Open Claude Code, Codex,
