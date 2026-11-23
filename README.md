@@ -99,6 +99,10 @@ Setup for every platform is in the **[setup guide](docs/SETUP.md)**.
 | WhatsApp | [Manual setup](docs/SETUP.md#whatsapp) |
 | Web interface | [Manual setup](docs/SETUP.md#web-interface) |
 
+You can [run multiple connectors in one service](docs/MANUAL-SERVICE.md#multiple-connectors-one-agent)
+using one configured agent. Each connector has its own credentials and
+conversation history; named agent profiles are not yet supported.
+
 Credentials go in an environment file; [`.env.example`](.env.example) lists every
 variable the bridge reads.
 

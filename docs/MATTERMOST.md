@@ -75,10 +75,12 @@ restrictions to make a protected operation succeed.
 
 ## Build, install, and start
 
-Continue with steps 4–6 of the [service guide](MANUAL-SERVICE.md). Use its
-Mattermost build (`--no-default-features`), dedicated binary, and `mattermost`
-unit instance. Do not reuse the Telegram helper's service name or assume its
-commands manage this manually installed service.
+Continue with steps 4–6 of the [service guide](MANUAL-SERVICE.md). For a
+Mattermost-only service, use its smaller `--no-default-features` build and
+`mattermost` unit instance. For a [combined service](MANUAL-SERVICE.md#multiple-connectors-one-agent)
+that includes Matrix or WhatsApp, use the SDK-enabled build. Do not reuse the
+Telegram helper's service name or assume its commands manage this manually
+installed service.
 
 `--check-config` only loads configuration. It does not test the token, channel
 membership, WebSocket connection, allowlists, or harness login.
