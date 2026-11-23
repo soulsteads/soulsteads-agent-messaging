@@ -226,6 +226,7 @@ struct Inner {
     cancel_writes: std::sync::Mutex<VecDeque<oneshot::Sender<std::result::Result<(), String>>>>,
     cancel_gate: Mutex<()>,
     child: Mutex<Child>,
+    stdout_closed: AtomicBool,
     closed: AtomicBool,
     closed_reason: std::sync::Mutex<Option<String>>,
     active: AtomicBool,
@@ -495,6 +496,7 @@ impl Client {
             cancel_writes: Default::default(),
             cancel_gate: Mutex::new(()),
             child: Mutex::new(child),
+            stdout_closed: AtomicBool::new(false),
             closed: AtomicBool::new(false),
             closed_reason: Default::default(),
             active: AtomicBool::new(false),
@@ -525,7 +527,15 @@ impl Client {
                         let count = (&mut reader)
                             .take(2 * 1024 * 1024 + 1)
                             .read_until(b'\n', &mut bytes)
-                            .await?;
+                            .await;
+                        if matches!(count, Ok(0) | Err(_))
+                            && let Some(inner) = weak.upgrade()
+                        {
+                            // Record disconnect before the SDK wakes failed requests.
+                            // Buffered terminal responses still drain normally.
+                            inner.stdout_closed.store(true, Ordering::SeqCst);
+                        }
+                        let count = count?;
                         if count == 0 {
                             return Ok(responses
                                 .pop_front()
@@ -708,6 +718,9 @@ impl Client {
     }
     pub fn accepts_followups(&self) -> bool {
         self.inner.active.load(Ordering::SeqCst)
+    }
+    pub(crate) fn transport_closed(&self) -> bool {
+        self.inner.stdout_closed.load(Ordering::SeqCst) || self.inner.closed.load(Ordering::SeqCst)
     }
     /// Enable before admitting prompts; generic ACP keeps concurrent steering.
     pub fn enable_serial_followups(&self) {
