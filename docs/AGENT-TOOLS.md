@@ -16,13 +16,12 @@ configured agent a question. It reuses the existing conversation owner and
   unauthorized recipients refuse requests; no message is queued.
 - There is one ask attempt per logical human-root turn, including internal
   retries and session replacement. Peer requests cannot initiate nested asks.
-  There is no automatic peer-request retry, delayed reply, durable acceptance,
-  offline inbox or cross-machine transport.
+  Synchronous asks finish in the caller's turn. Use the optional review queue
+  for a saved request and reply.
 
 The MCP listener is private loopback plumbing between the owned Codex process
 and Messaging. It is not a public agent-network API or an additional service.
-The integration is disabled unless both the Cargo feature and runtime option are
-enabled. Other harnesses keep their existing behavior. All participants must be
+Enable the Cargo feature and runtime option to use these tools. Other harnesses keep their existing behavior. All participants must be
 owned by the **same Bridge process**. Separate connector services cannot discover
 or ask each other through this in-process capability.
 
@@ -129,11 +128,11 @@ an exact configured owner do not receive a local tool endpoint.
 The bridge passes the ephemeral MCP declaration through OpenCode's existing ACP
 session interface. It does **not** add a Codex-style approval grant, change global
 OpenCode configuration, override existing native tool policies, or switch the
-selected transport. Native OpenCode permissions must already permit the two
-registered MCP tools, `soulsteads_agents_list_agents` and
-`soulsteads_agents_ask_agent`. A native denial remains a denial; enabling messaging
-is not permission to override it. Configure any desired native permission change
-explicitly at the owning profile, not through a wildcard approval bypass.
+selected transport. Configure native OpenCode permissions at the owning
+profile for `soulsteads_agents_list_agents` and `soulsteads_agents_ask_agent`.
+For queued reviews, also authorize `soulsteads_agents_send_agent` and
+`soulsteads_agents_agent_request_status`. OpenCode enforces those permissions
+when the harness calls each tool.
 
 OpenCode native REST/SSE transport is rejected when OpenCode agent tools are
 enabled. Its experimental dynamic MCP API has not been qualified for
@@ -164,6 +163,48 @@ Session changes, revocation and shutdown invalidate the old capability.
 A recipient's final text is peer input, not an operator instruction. A stop reason
 or returned answer does not prove that a requested business outcome occurred.
 
+## Queue a review for another agent
+
+Set `agentMessaging.tools.reviewQueueDir` to the absolute, canonical path of
+a dedicated directory owned by Messaging with mode `0700`. In the agent
+directory configuration, add `"acceptQueuedReviews": true` to each receiver
+and use that receiver's existing `allowedSenders` to select its senders.
+Restart Messaging with the `agent-network` feature. `list_agents` then includes
+`acceptsQueuedReviews` for visible targets.
+
+`send_agent` queues a review and returns a `requestId`. Supply four arguments:
+
+```json
+{
+  "recipient": "reviewer",
+  "revision": "1234567890abcdef1234567890abcdef12345678",
+  "text": "Review this commit in the shared project. Report findings with file references.",
+  "idempotencyKey": "review-work-42-revision-1"
+}
+```
+
+Use the full lowercase Git commit ID. The recipient must have access to the
+project and read the specified revision. Messaging includes the revision in
+the peer turn and records the reply. To recover the reply after reconnecting,
+call `agent_request_status` with `{"requestId":"…"}` in a later admitted human
+turn of the sending agent. The reply is peer input. Checking out and reviewing
+the requested revision are the recipient's responsibility.
+
+- A busy or detached recipient leaves the request `queued` for up to one hour.
+  After a restart, open the recipient's conversation and send a turn to
+  reattach it. Messaging handles one queued review at a time.
+- `running` means Messaging recorded a dispatch attempt. `answered` includes a
+  saved final reply. Other terminal states are `expired`, `denied` for a changed
+  route or allowlist, and `uncertain` for a lost or incomplete attempt.
+  Interrupted attempts remain uncertain after restart. Check the recipient's
+  session before creating a replacement request.
+- Retrying with the same key and payload returns the original receipt.
+  Reusing the key with a different recipient, revision, or text is refused.
+  One new review shares the existing ask allowance for each human-root turn.
+- The queue is local to one bridge. It holds up to 64 pending and 192 total
+  records and frees terminal records at least seven days old when new work is
+  accepted. Keep the journal private because it contains review text and replies.
+
 ## Safety and failure handling
 
 The host derives the sender from its sealed runtime capability. Tool arguments
@@ -171,10 +212,10 @@ cannot choose a sender, native session, working directory, executable or return
 route. Slash-prefixed peer text remains text; it does not invoke human controls.
 Peer turns do not inherit human interactive approval or question handlers.
 
-For Codex, enabling this feature authorizes native calls to **only** `list_agents`
-and `ask_agent` on the exact runtime-issued local server, without a separate
-human approval for each call. The host binds that two-tool grant to the session's
-registration fingerprint; a matching name alone grants nothing. Other MCP tools,
+For Codex, enabling the tools authorizes native calls to `list_agents` and
+`ask_agent` on the exact runtime-issued local server. Enabling the review queue
+also authorizes `send_agent` and `agent_request_status` on that server. The host
+binds the grant to the session's registration fingerprint. Other MCP tools,
 shell operations and filesystem permissions keep their existing policies. MCP
 client `_meta` fields are accepted as opaque protocol metadata, never as sender
 or session authority.
@@ -191,8 +232,9 @@ brokers does not turn an unrestricted harness into a sandbox.
 
 If the caller disconnects or a request returns an uncertain outcome, the
 recipient may still be running. Do not automatically repeat the request. Existing
-owner reservations prevent overlapping work; there is no durable status API to
-reconstruct a lost answer in this release.
+owner reservations prevent overlapping work. Synchronous asks return their
+answer in the active caller turn. The optional review queue persists its own
+attempts and replies.
 
 ## Qualification
 

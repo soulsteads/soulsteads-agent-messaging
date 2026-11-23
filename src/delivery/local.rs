@@ -1,6 +1,6 @@
-#[cfg(feature = "agent-network")]
-use super::DirectRefusal;
 use super::{AgentId, ConversationKey, PeerSend, admission::AdmissionConfig};
+#[cfg(feature = "agent-network")]
+use super::{DirectRefusal, reviews};
 use crate::store::Store;
 use std::{
     collections::BTreeMap,
@@ -38,6 +38,9 @@ pub struct VisibleRecord {
     id: String,
     name: String,
     state: RecipientState,
+    #[cfg(feature = "agent-network")]
+    #[serde(skip)]
+    accepts_queued_reviews: bool,
 }
 
 impl VisibleRecord {
@@ -49,6 +52,11 @@ impl VisibleRecord {
     }
     pub fn state(&self) -> RecipientState {
         self.state
+    }
+
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn accepts_queued_reviews(&self) -> bool {
+        self.accepts_queued_reviews
     }
 }
 
@@ -141,9 +149,15 @@ struct BindingSnapshot {
 }
 
 #[cfg(feature = "agent-network")]
+enum PeerOrigin {
+    Direct(CallerContext),
+    Review(reviews::Route),
+}
+
+#[cfg(feature = "agent-network")]
 pub(crate) struct DirectAdmission {
     registry: Arc<OwnerRegistry>,
-    caller: CallerContext,
+    origin: PeerOrigin,
     store_path: PathBuf,
     recipient: BindingSnapshot,
 }
@@ -155,10 +169,16 @@ impl DirectAdmission {
     }
 
     pub(crate) fn is_current(&self) -> bool {
-        self.registry.current(&self.caller, &self.store_path)
-            && self
-                .registry
-                .sender_allowed(&self.caller.agent, &self.recipient.agent)
+        let sender_current = match &self.origin {
+            PeerOrigin::Direct(caller) => {
+                self.registry.current(caller, &self.store_path)
+                    && self
+                        .registry
+                        .sender_allowed(&caller.agent, &self.recipient.agent)
+            }
+            PeerOrigin::Review(route) => self.registry.review_route_current(route),
+        };
+        sender_current
             && self
                 .registry
                 .binding_current(&self.recipient, &self.store_path)
@@ -177,7 +197,10 @@ impl DirectAdmission {
     }
 
     pub(crate) fn sender_id(&self) -> &str {
-        self.caller.agent.as_str()
+        match &self.origin {
+            PeerOrigin::Direct(caller) => caller.agent.as_str(),
+            PeerOrigin::Review(route) => &route.sender.id,
+        }
     }
 
     pub(crate) fn recipient_id(&self) -> &str {
@@ -514,6 +537,8 @@ impl OwnerRegistry {
                 .map(|owner| VisibleRecord {
                     id: owner.agent.as_str().to_owned(),
                     name: owner.name.clone(),
+                    #[cfg(feature = "agent-network")]
+                    accepts_queued_reviews: owner.accept_queued_reviews,
                     state: if self.recipient_is_current(&owner.agent, store_path) {
                         RecipientState::Attached
                     } else {
@@ -541,11 +566,68 @@ impl OwnerRegistry {
         let recipient = self.state.lock().ok()?.by_agent.get(recipient)?.clone();
         let admission = DirectAdmission {
             registry: self.clone(),
-            caller: caller.clone(),
+            origin: PeerOrigin::Direct(caller.clone()),
             store_path: store_path.clone(),
             recipient: BindingSnapshot::from(&recipient),
         };
         admission.is_current().then_some(admission)
+    }
+
+    #[cfg(feature = "agent-network")]
+    fn review_route(&self, sender: &AgentId, recipient: &AgentId) -> Option<reviews::Route> {
+        let target = self.config.owner(recipient)?;
+        if sender == recipient
+            || !target.accept_queued_reviews
+            || !target.allowed_senders.contains(sender)
+        {
+            return None;
+        }
+        Some(reviews::Route {
+            sender: self.config.owner(sender)?.review_participant(),
+            recipient: target.review_participant(),
+        })
+    }
+
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn review_route_current(&self, route: &reviews::Route) -> bool {
+        let (Ok(sender), Ok(recipient)) = (
+            AgentId::try_from(route.sender.id.as_str()),
+            AgentId::try_from(route.recipient.id.as_str()),
+        ) else {
+            return false;
+        };
+        self.review_route(&sender, &recipient).as_ref() == Some(route)
+    }
+
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn admit_review(
+        self: &Arc<Self>,
+        route: &reviews::Route,
+        store_path: &std::path::Path,
+    ) -> Result<DirectAdmission, DirectRefusal> {
+        if !self.review_route_current(route) {
+            return Err(DirectRefusal::Denied);
+        }
+        let recipient =
+            AgentId::try_from(route.recipient.id.as_str()).map_err(|_| DirectRefusal::Denied)?;
+        let binding = self
+            .state
+            .lock()
+            .map_err(|_| DirectRefusal::Unavailable)?
+            .by_agent
+            .get(&recipient)
+            .map(BindingSnapshot::from)
+            .ok_or(DirectRefusal::Unavailable)?;
+        let admission = DirectAdmission {
+            registry: self.clone(),
+            origin: PeerOrigin::Review(route.clone()),
+            store_path: store_path.to_owned(),
+            recipient: binding,
+        };
+        admission
+            .is_current()
+            .then_some(admission)
+            .ok_or(DirectRefusal::Unavailable)
     }
 
     fn prepare_return_route(
@@ -658,6 +740,33 @@ impl LocalClient {
         registry
             .admit_direct(&self.inner.caller, &self.inner.store_path, recipient)
             .ok_or(DirectRefusal::Denied)
+    }
+
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn review_participant(
+        &self,
+        registry: &Arc<OwnerRegistry>,
+    ) -> Option<reviews::Participant> {
+        if !Weak::ptr_eq(&self.inner.registry, &Arc::downgrade(registry)) {
+            return None;
+        }
+        let caller = &self.inner.caller;
+        if caller.source != SourceClass::HumanRoot
+            || !registry.current(caller, &self.inner.store_path)
+        {
+            return None;
+        }
+        Some(registry.config.owner(&caller.agent)?.review_participant())
+    }
+
+    #[cfg(feature = "agent-network")]
+    pub(crate) fn review_route(
+        &self,
+        registry: &Arc<OwnerRegistry>,
+        recipient: &AgentId,
+    ) -> Option<reviews::Route> {
+        self.review_participant(registry)?;
+        registry.review_route(&self.inner.caller.agent, recipient)
     }
 
     pub async fn list_visible(&self) -> Result<Vec<VisibleRecord>, LocalRefusal> {

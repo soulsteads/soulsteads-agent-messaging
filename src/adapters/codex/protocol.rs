@@ -55,20 +55,28 @@ pub(super) fn mcp_config(servers: &Value, cwd: &Path) -> Result<Value> {
         let value = {
             let mut value = value;
             if name == "soulsteads_agents"
-                && crate::delivery::agent_tools::runtime_grant_fingerprint(server).is_some_and(
-                    |fingerprint| {
-                        std::env::var("SOULSTEADS_LOCAL_AGENT_TOOLS_GRANT")
-                            .ok()
-                            .as_deref()
-                            == Some(&fingerprint)
-                    },
-                )
+                && let Some(fingerprint) =
+                    crate::delivery::agent_tools::runtime_grant_fingerprint(server)
+                && std::env::var("SOULSTEADS_LOCAL_AGENT_TOOLS_GRANT")
+                    .ok()
+                    .as_deref()
+                    == Some(&fingerprint)
             {
-                value["enabled_tools"] = json!(["list_agents", "ask_agent"]);
-                value["tools"] = json!({
-                    "list_agents":{"approval_mode":"approve"},
-                    "ask_agent":{"approval_mode":"approve"}
-                });
+                let mut tools = vec!["list_agents", "ask_agent"];
+                if std::env::var("SOULSTEADS_LOCAL_AGENT_REVIEW_GRANT")
+                    .ok()
+                    .as_deref()
+                    == Some(&fingerprint)
+                {
+                    tools.extend(["send_agent", "agent_request_status"]);
+                }
+                value["enabled_tools"] = json!(tools);
+                value["tools"] = Value::Object(
+                    tools
+                        .into_iter()
+                        .map(|tool| (tool.to_owned(), json!({"approval_mode":"approve"})))
+                        .collect(),
+                );
                 value["default_tools_approval_mode"] = json!("prompt");
                 value["tool_timeout_sec"] = json!(310);
             }

@@ -222,9 +222,17 @@ pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
             }
         }
     }
+    if tools.get("reviewQueueDir").is_some_and(|path| {
+        !enabled
+            || !path
+                .as_str()
+                .is_some_and(|value| std::path::Path::new(value).is_absolute())
+    }) {
+        bail!("agentMessaging.tools.reviewQueueDir requires enabled tools and an absolute path");
+    }
     if tools
         .keys()
-        .any(|key| !["enabled", "harness"].contains(&key.as_str()))
+        .any(|key| !["enabled", "harness", "reviewQueueDir"].contains(&key.as_str()))
     {
         bail!("agentMessaging.tools contains an unsupported setting");
     }
