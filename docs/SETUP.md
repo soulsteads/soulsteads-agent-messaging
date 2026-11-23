@@ -469,81 +469,11 @@ encrypted room.
 
 ## Mattermost
 
-For a complete bot-to-conversation walkthrough, follow the
-[Mattermost guide](MATTERMOST.md) and [manual user-service guide](MANUAL-SERVICE.md).
-The settings below remain a connector reference.
-
-Use your Mattermost bot to talk to an agent in selected channels. The connector
-uses Mattermost's API and WebSocket connection; it does not need a separate
-TypeScript or Bun process.
-
-### Configure your bot
-
-You need your server URL, a bot token, and the IDs of the users and channels you
-want to allow. Keep the token in a private environment file, not in Git or
-command arguments.
-
-Add the following to your bridge configuration, replacing the placeholder IDs.
-The environment variables must be available to the bridge process.
-
-```json
-{
-  "trigger": "!agent",
-  "mattermost": {
-    "enabled": true,
-    "url": "{env:MATTERMOST_URL}",
-    "token": "{env:MATTERMOST_TOKEN}",
-    "allowedUsers": ["REPLACE_WITH_USER_ID"],
-    "allowedChannels": ["REPLACE_WITH_CHANNEL_ID"],
-    "threadIsolation": true,
-    "respondToMentions": true,
-    "respondToThreadReplies": true,
-    "respondToAllMessages": false
-  }
-}
-```
-
-Set both `allowedUsers` and `allowedChannels` explicitly. A missing, empty,
-invalid, or nonmatching channel list is rejected. The bridge ignores its own
-posts, system posts, and messages outside the allowed users and channels.
-These settings configure Mattermost only; you still need an agent configured
-for the bridge.
-
-### Send your first message
-
-In an allowed channel, send either:
-
-```text
-!agent What can you help with?
-```
-
-or mention the bot using its actual Mattermost username:
-
-```text
-@bot_username What can you help with?
-```
-
-Check that a reply arrives in the expected thread, then reply in that thread.
-With the example settings, plain thread replies continue an active session.
-After restarting the bridge, explicitly address the bot once in an existing
-thread to resume its saved history.
-
-### Choose when the bot replies
-
-- **`respondToMentions`:** lets a mention start work. Disabling it prevents that unless `respondToAllMessages` is enabled.
-- **`respondToThreadReplies`:** lets replies continue an active isolated thread session.
-- **`respondToAllMessages`:** defaults to `false`. Set it to `true` only if every eligible nonempty post in an allowed channel should start work, including unaddressed top-level posts and slash commands. It does not bypass user/channel restrictions. Values other than the boolean `true` do not enable it.
-- **`threadIsolation`:** keeps sessions and output in threads. Turning it off sends replies, errors, notices, and images to the channel and disables implicit plain-thread continuation.
-
-### Limits to know
-
-- The connector sends text, commands, tool updates, and generated images. It does not read incoming attachment bodies or show typing indicators.
-- Interactive approval prompts are not available in Mattermost. Protected operations are denied and reported; Matrix approval features do not apply here.
-- Access is controlled by user and channel IDs, not a team-name filter.
-- Automated transport tests are not a substitute for checking a real reply from your allowed account. Confirm both the reply and its thread placement before relying on the setup.
-
-The service commands in the Telegram section apply to the Telegram helper, not to
-a separately managed Mattermost service.
+Follow the [Mattermost guide](MATTERMOST.md) for bot setup, thread commands,
+and a first conversation. Install it using the
+[manual user-service guide](MANUAL-SERVICE.md), not the Telegram helper.
+For restart and reply recovery, see
+[optional durable turn receipts](MATTERMOST.md#optional-durable-turn-receipts).
 
 ---
 

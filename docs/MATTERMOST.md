@@ -63,8 +63,9 @@ In the private `bridge.json`, save this complete example and replace the IDs:
 
 All other connectors remain disabled by default. Set both authorization lists.
 A missing, empty, invalid, or nonmatching channel list prevents admission of
-messages; it is not necessarily a startup error. An empty sender list can permit
-all senders, so do not remove it while troubleshooting. Access uses IDs, not the
+messages. The service rejects an empty sender list unless you explicitly opt in
+with `allowAllUsers: true`. Leave that off for a restricted bot. The bridge also
+ignores its own posts and system posts. Access uses IDs, not the
 `MATTERMOST_TEAM` setting.
 
 For another harness, use the [documented backend choices](MANUAL-SERVICE.md#2-choose-a-harness-and-understand-sessions).
@@ -82,6 +83,44 @@ commands manage this manually installed service.
 `--check-config` only loads configuration. It does not test the token, channel
 membership, WebSocket connection, allowlists, or harness login.
 
+## Optional durable turn receipts
+
+To enable receipts on a Unix gateway, create a dedicated, owner-only directory
+(mode `0700`) on persistent local storage and set `mattermost.turnReceiptDir`
+to its absolute, non-symlink path. Keep `threadIsolation: true`. Use one gateway
+process and one stable Mattermost server URL and bot identity per receipt directory.
+Keep the directory and its parents stable and trusted while the bridge runs.
+The bridge takes an exclusive lock and refuses to start with invalid receipt data.
+
+Address the bot with these commands in the **original thread**:
+
+- `!agent /status` shows the session status and your receipt status. Unsent or
+  uncertain replies take precedence over the most recent turn's status.
+- `!agent /recover` sends your oldest saved, known-unsent final text reply in the
+  thread. It does not reopen the session, call the model, or rerun tools. A
+  different sender, thread, server, or bot cannot recover it. Replaying a recovery
+  post that already attempted delivery does not send another saved reply.
+- If a reply is **uncertain**, look in the thread. The bridge will not retry it:
+  Mattermost might have accepted all or part of the text before the connection
+  failed. This also covers a restart after the send was recorded but before the
+  POST could leave the gateway. There is no automatic remote reconciliation.
+- If the turn is **interrupted or unknown**, the original Mattermost post will
+  not start another turn after a restart. Tool effects may already have happened.
+  Inspect the session before deciding whether to send a new request.
+
+Receipts cover final text only. Tool updates, file/image uploads, failed-turn
+partial output, and control notices are not recovered. Saving starts before the
+prompt, not when the WebSocket receives a post; this is not a durable input queue.
+`/reset` and `/resume` affect session history, not reply receipts. The private
+journal `turns.json` retains undelivered reply text and acknowledged post IDs
+until the associated state changes; protect it as chat data. Keep it across
+restarts. Deleting or replacing it loses recovery and replay protection.
+The journal does not auto-prune. The limits are 8 MiB (including reserved space
+for concurrent turns), 8,192 turns, and 256 KiB UTF-8 / 384 KiB JSON per final
+reply. At capacity, new prompts are refused before prompt dispatch; oversized
+final replies are not sent. Resolve pending replies and monitor capacity before
+using this opt-in feature for sustained traffic.
+
 ## Verify a real conversation
 
 From the allowed account in the allowed channel:
@@ -91,10 +130,13 @@ From the allowed account in the allowed channel:
    harness-generated reply arrives in the expected thread.
 2. Reply plainly in that thread: `What exact marker did you just reply with?`
    Check that it continues the active conversation.
-3. Restart the exact bridge service when idle. Explicitly address the bot once
-   in the existing thread, for example `!agent What marker did we use?`, to
-   resume saved history. Plain thread replies alone do not reactivate an idle
-   persisted binding after restart.
+3. Restart the exact bridge service when idle. In the existing thread, send
+   `!agent /status` to check for a saved conversation, then `!agent /resume` to
+   reopen it without sending a prompt or replaying old work. Once the bot
+   confirms, a plain threaded reply such as `What marker did we use?` continues
+   that conversation when `respondToThreadReplies` is enabled. An addressed
+   question still works without `/resume`; a plain reply alone does not reopen
+   a saved conversation after restart.
 4. With a separately consented test account, check that an unauthorized sender
    does not start harness work. If testing a disallowed channel too, explicitly
    authorize its bot membership/test without adding it to `allowedChannels`, and
@@ -110,7 +152,16 @@ complete verification.
 - `respondToThreadReplies` allows plain replies to continue an **active** isolated
   thread session.
 - `threadIsolation: false` sends replies and notices to the channel and disables
-  implicit plain-thread continuation.
+  implicit plain-thread continuation and `/resume`.
+- `/resume` uses only the current thread's saved backend and session. It does
+  not accept a session ID, create a missing session, or reset history. It does
+  not recover queued messages or work interrupted by a shutdown.
+- To interrupt an active prompt, address the bot with `/cancel` (no arguments).
+  With thread isolation enabled, this targets only the current thread; otherwise
+  it targets the shared channel conversation. Without an open session, it does
+  not start or reopen one. `Cancellation requested.` acknowledges the request,
+  not that a prompt was still running, that the backend has stopped, or that
+  tools have been rolled back.
 - `respondToAllMessages: true` admits eligible unaddressed posts, including slash
   commands. It does not bypass sender/channel restrictions. Leave it off unless
   the allowed channel is intentionally meant for that behavior.
@@ -118,6 +169,5 @@ complete verification.
   not read incoming attachment bodies or show typing indicators.
 - Interactive Matrix approvals do not apply to this connector.
 
-The [existing Mattermost reference](SETUP.md#mattermost) describes these settings
-in more detail. For operation, backup, upgrade, and uninstall, return to the
+For operation, backup, upgrade, and uninstall, return to the
 [service guide](MANUAL-SERVICE.md#operate-upgrade-and-remove).

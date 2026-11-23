@@ -6,6 +6,7 @@ pub mod connectors;
 pub mod core;
 pub mod debug_log;
 pub mod delivery;
+mod mattermost_receipts;
 pub mod media;
 pub use adapters::opencode::native_client;
 pub use adapters::opencode::native_events;

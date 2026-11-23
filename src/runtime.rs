@@ -283,6 +283,19 @@ impl<'a> ResolvedPrompt<'a> {
 #[async_trait]
 pub trait Sink: Send + Sync {
     async fn emit(&self, event: Value) -> Result<()>;
+    /// Trusted in-process identity of the Mattermost server and authenticated bot.
+    fn mattermost_receipt_identity(&self, _event: &Event) -> Option<String> {
+        None
+    }
+    /// Deliver final text once. The sink must commit `before_first_post`
+    /// immediately before its first dispatch and must never retry a POST.
+    async fn deliver_mattermost_reply(
+        &self,
+        _text: &str,
+        _before_first_post: &mut (dyn FnMut() -> Result<()> + Send),
+    ) -> Result<Vec<String>> {
+        bail!("No durable Mattermost delivery sink")
+    }
     /// Trusted in-process hook issued only from an admitted human owner turn.
     fn local_client(&self, _client: LocalClient) {}
     fn matrix_user_id(&self) -> Option<String> {
@@ -362,10 +375,20 @@ async fn deliver_inline(
 async fn finish_response(
     sink: &dyn Sink,
     text: &str,
-    mut observation: Value,
+    observation: Value,
     uploaded: usize,
 ) -> Result<()> {
     let result = sink.emit(json!({"type":"response","text":text})).await;
+    observe_response(sink, text, observation, uploaded, result).await
+}
+
+async fn observe_response(
+    sink: &dyn Sink,
+    text: &str,
+    mut observation: Value,
+    uploaded: usize,
+    result: Result<()>,
+) -> Result<()> {
     observation["deliveredChars"] = if result.is_ok() {
         text.encode_utf16().count().into()
     } else {
@@ -430,6 +453,11 @@ async fn matrix_read(sink: &dyn Sink, id: &str) {
         let _ = sink.emit(receipt).await;
     }
 }
+enum SessionOpen {
+    Ensure(Option<Entry>),
+    Resume(Entry),
+}
+
 struct Conversation {
     client: Option<Client>,
     backend: String,
@@ -896,6 +924,7 @@ pub struct Bridge {
     pub env: BTreeMap<String, String>,
     workspace: PathBuf,
     store: Store,
+    mattermost_receipts: Option<crate::mattermost_receipts::Store>,
     sessions: Mutex<HashMap<String, Arc<ConversationSlot>>>,
     dedup: Mutex<HashMap<String, Instant>>,
     rates: Mutex<HashMap<String, Instant>>,
@@ -1034,11 +1063,16 @@ impl Bridge {
             bail!("sessionStorePath is required");
         }
         let store = Store::new(path);
+        let mattermost_receipts = crate::config::mattermost_receipt_dir(&config)?
+            .map(crate::mattermost_receipts::Store::open)
+            .transpose()
+            .context("Cannot open Mattermost turn receipts")?;
         Ok(Self {
             config,
             env,
             workspace,
             store,
+            mattermost_receipts,
             sessions: Mutex::new(HashMap::new()),
             dedup: Mutex::new(HashMap::new()),
             rates: Mutex::new(HashMap::new()),
@@ -1650,7 +1684,9 @@ impl Bridge {
                 source_web_commands,
             )
             .await;
-        if let Err(error) = &result {
+        if let Err(error) = &result
+            && !error.is::<crate::mattermost_receipts::ReplyDeliveryError>()
+        {
             if event.platform == "matrix" && matrix_control(&command) {
                 let prefix = if command == "/backend" {
                     "Backend switch failed; previous selection and histories were preserved. Check backend configuration/authentication."
@@ -1784,6 +1820,28 @@ impl Bridge {
             return Ok(client.clone());
         }
         let stored = self.store.get(platform, context, backend)?;
+        self.open_session(
+            platform,
+            context,
+            backend,
+            state,
+            SessionOpen::Ensure(stored),
+        )
+        .await
+    }
+
+    async fn open_session(
+        &self,
+        platform: &str,
+        context: &str,
+        backend: &str,
+        state: &mut Conversation,
+        operation: SessionOpen,
+    ) -> Result<Client> {
+        let (stored, resume_only) = match operation {
+            SessionOpen::Ensure(stored) => (stored, false),
+            SessionOpen::Resume(stored) => (Some(stored), true),
+        };
         let configured_home = self.agent_home(backend)?;
         let directory = configured_home.clone().unwrap_or_else(|| {
             stored
@@ -1793,7 +1851,9 @@ impl Bridge {
         });
         let identity = self.backend_identity(backend)?;
         if let Some(stored) = &stored
-            && (configured_home.is_some() || stored.backend_id.contains(";agent-home:"))
+            && (resume_only
+                || configured_home.is_some()
+                || stored.backend_id.contains(";agent-home:"))
             && (stored.cwd != directory.to_string_lossy() || stored.backend_id != identity)
         {
             bail!("Stored backend identity or workspace differs; history preserved");
@@ -1859,18 +1919,20 @@ impl Bridge {
             if let Some(applied) = &applied {
                 applied.verify()?;
             }
-            self.store.set(
-                Entry {
-                    connector: platform.into(),
-                    thread_id: context.into(),
-                    session_id: session,
-                    cwd: directory.to_string_lossy().into(),
-                    backend_id: identity,
-                    updated_at: chrono::Utc::now().to_rfc3339(),
-                    backend: backend.into(),
-                },
-                true,
-            )?;
+            if !resume_only {
+                self.store.set(
+                    Entry {
+                        connector: platform.into(),
+                        thread_id: context.into(),
+                        session_id: session,
+                        cwd: directory.to_string_lossy().into(),
+                        backend_id: identity,
+                        updated_at: chrono::Utc::now().to_rfc3339(),
+                        backend: backend.into(),
+                    },
+                    true,
+                )?;
+            }
             Result::<()>::Ok(())
         }
         .await;
@@ -1931,6 +1993,22 @@ impl Bridge {
                 .unwrap_or(60.0)
                 .max(10.0);
             text.push_str(&format!("- /p - List saved projects/workdirs from the ACP backend\n- /p <n> - Select a project/workdir\n- /s - List saved sessions in the selected project\n- /s <n> - Switch to a saved session and show recent history\n- /m <n> - Mirror a saved session read-only, checking every {seconds}s\n- /m - Stop mirror mode\n- /r - Reload current session and show recent history\n- /d - Detach from the current session without deleting it\n"));
+        }
+        if event.platform == "mattermost" && boolean(&self.config["mattermost"], "threadIsolation")
+        {
+            text.push_str(
+                "- /resume - Reopen this thread's saved conversation without sending a prompt\n",
+            );
+        }
+        if event.platform == "mattermost" {
+            text.push_str(
+                "- /cancel - Request cancellation of the active prompt in this conversation\n",
+            );
+            if self.mattermost_receipts.is_some() {
+                text.push_str(
+                    "- /recover - Send your oldest saved, unsent text reply in this thread\n",
+                );
+            }
         }
         text.push_str("- /clear or /reset - Delete current session history\n");
         if matches!(event.platform.as_str(), "web" | "telegram" | "mattermost")
@@ -2453,6 +2531,39 @@ impl Bridge {
             .next()
             .unwrap_or("")
             .to_ascii_lowercase();
+        let receipt = if event.platform == "mattermost" {
+            self.mattermost_receipts
+                .as_ref()
+                .map(|store| {
+                    Ok::<_, anyhow::Error>((
+                        store,
+                        crate::mattermost_receipts::Scope::new(event, sink)?,
+                    ))
+                })
+                .transpose()?
+        } else {
+            None
+        };
+        if let Some((store, scope)) = &receipt {
+            if store.seen(scope)? {
+                // WebSocket replay is not permission to execute a turn again.
+                return Ok(());
+            }
+            if command == "/recover" {
+                if event.text.split_whitespace().count() != 1 {
+                    return sink
+                        .emit(
+                            json!({"type":"notice","text":"Usage: /recover (without arguments)."}),
+                        )
+                        .await;
+                }
+                return store.recover(scope, sink).await;
+            }
+        } else if event.platform == "mattermost" && command == "/recover" {
+            return sink
+                .emit(json!({"type":"notice","text":"Mattermost reply recovery is not enabled."}))
+                .await;
+        }
         let cancel_dispatch = if command == "/cancel" {
             if let Some(turn) = &turn {
                 Some(turn.cancel_dispatch.lock().await)
@@ -2516,6 +2627,23 @@ impl Bridge {
             }
         }
         if command == "/cancel" {
+            if event.platform == "mattermost" {
+                if !argument.is_empty() {
+                    return sink
+                        .emit(
+                            json!({"type":"response","text":"Usage: /cancel (without arguments)."}),
+                        )
+                        .await;
+                }
+                if state.client.is_none() {
+                    let text = if boolean(&self.config["mattermost"], "threadIsolation") {
+                        "No open session in this thread."
+                    } else {
+                        "No open session in this channel."
+                    };
+                    return sink.emit(json!({"type":"response","text":text})).await;
+                }
+            }
             if event.platform == "matrix" {
                 let Some(turn) = &turn else {
                     return sink
@@ -2556,7 +2684,7 @@ impl Bridge {
                 .await;
         }
         if command == "/status" {
-            let text = if matches!(event.platform.as_str(), "matrix" | "cli") {
+            let mut text = if matches!(event.platform.as_str(), "matrix" | "cli") {
                 format!(
                     "Backend: {}\nMessages: {}\nInput/output chars: {}/{}",
                     self.selected(&event.platform, context)?,
@@ -2565,7 +2693,15 @@ impl Bridge {
                     state.output_chars
                 )
             } else if state.client.is_none() {
-                "No active session.".to_owned()
+                if event.platform == "mattermost"
+                    && boolean(&self.config["mattermost"], "threadIsolation")
+                    && !event.thread.is_empty()
+                    && self.has_persisted(&event.platform, context)?
+                {
+                    "This thread has a saved session. Address the bot with /resume to reopen it without starting a prompt.".to_owned()
+                } else {
+                    "No active session.".to_owned()
+                }
             } else {
                 crate::core::session_status(
                     state.message_count,
@@ -2575,6 +2711,10 @@ impl Bridge {
                     state.last_activity.elapsed(),
                 )
             };
+            if let Some((store, scope)) = &receipt {
+                text.push_str("\n\n");
+                text.push_str(store.status(scope)?);
+            }
             return sink.emit(json!({"type":"response","text":text})).await;
         }
         if event.platform == "matrix" && matches!(command.as_str(), "/help" | "/h") {
@@ -2621,6 +2761,39 @@ impl Bridge {
                 return Ok(());
             }
             return sink.emit(json!({"type":"response","text":"A request is already running in this thread."})).await;
+        }
+        if event.platform == "mattermost" && command == "/resume" {
+            let text = if !boolean(&self.config["mattermost"], "threadIsolation")
+                || event.thread.is_empty()
+            {
+                "Resume requires an isolated Mattermost thread."
+            } else if !argument.is_empty() {
+                "Usage: /resume (without a session ID)."
+            } else {
+                let backend = self.selected(&event.platform, context)?;
+                let Some(saved) = self.store.get(&event.platform, context, &backend)? else {
+                    return sink.emit(json!({"type":"response","text":"No saved session is bound to this thread."})).await;
+                };
+                if let Some(client) = &state.client {
+                    if state.backend != backend
+                        || client.session_id().await.as_deref() != Some(saved.session_id.as_str())
+                    {
+                        bail!("Active session does not match the saved thread binding");
+                    }
+                    "This thread's saved session is already active."
+                } else {
+                    self.open_session(
+                        &event.platform,
+                        context,
+                        &backend,
+                        &mut state,
+                        SessionOpen::Resume(saved),
+                    )
+                    .await?;
+                    "Saved session resumed."
+                }
+            };
+            return sink.emit(json!({"type":"response","text":text})).await;
         }
         if matches!(command.as_str(), "/clear" | "/reset" | "/d" | "/detach") {
             let backend = self.selected(&event.platform, context)?;
@@ -2792,6 +2965,10 @@ impl Bridge {
         if event.platform != "matrix" {
             sink.emit(json!({"type":"thinking"})).await?;
         }
+        let durable_turn = receipt
+            .as_ref()
+            .map(|(store, scope)| store.begin(scope))
+            .transpose()?;
         drop(state);
         let local_client = self
             .issue_local_client(event, context, &backend, &client, sink)
@@ -3070,6 +3247,16 @@ impl Bridge {
         let mut observation = observation;
         observation["uploadedMedia"] = successful_uploads.into();
         observation["uploadFailures"] = failed_uploads.into();
+        if let Some(turn) = durable_turn {
+            drop(state);
+            let outcome = match result.stop_reason.as_deref() {
+                Some("cancelled") => crate::mattermost_receipts::Outcome::Cancelled,
+                Some("end_turn") => crate::mattermost_receipts::Outcome::Completed,
+                _ => crate::mattermost_receipts::Outcome::Stopped,
+            };
+            let result = turn.finish(outcome, text, sink).await;
+            return observe_response(sink, text, observation, successful_images, result).await;
+        }
         finish_response(sink, text, observation, successful_images).await
     }
     async fn resolve_human_prompt<'a>(
