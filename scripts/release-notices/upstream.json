@@ -1,0 +1,290 @@
+[
+  {
+    "origin": "https://github.com/agentclientprotocol/agent-client-protocol",
+    "revision": "4cf3dd858c819fc3ab99ae53f76883ede0345a10",
+    "crates": {
+      "agent-client-protocol-schema-1.11.0": {
+        "path_in_vcs": "agent-client-protocol-schema"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/agentclientprotocol/agent-client-protocol/blob/4cf3dd858c819fc3ab99ae53f76883ede0345a10/LICENSE",
+        "sha256": "f250d08cee4549b22b3b4aaaf3a743473336fd280316df5d0340717e5127a221"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/anthropics/buffa",
+    "revision": "1f5d80e2c8d31c147742d8ec826a3219c4fcd4a7",
+    "crates": {
+      "buffa-descriptor-0.9.2": {
+        "path_in_vcs": "buffa-descriptor"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/anthropics/buffa/blob/1f5d80e2c8d31c147742d8ec826a3219c4fcd4a7/LICENSE",
+        "sha256": "e26ae9475108d3b118fe27915d36e8c5ab72732a8bbba24787eb4f45492c3300"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/null8626/decancer",
+    "revision": "86c57aaf0048ca07577de9a79e488909b5001ad6",
+    "crates": {
+      "decancer-3.3.3": {
+        "path_in_vcs": "core"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/null8626/decancer/blob/86c57aaf0048ca07577de9a79e488909b5001ad6/LICENSE",
+        "sha256": "bbbb3f5f5cb288d63dad6e80ab04eab6c07f28643b79b9c447f629a6f8b37fe7"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/jplatte/eyeball",
+    "revision": "01594bb93fc7029b1ba0a2097080cfebf9ad1655",
+    "crates": {
+      "eyeball-0.8.8": {
+        "path_in_vcs": "eyeball"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/jplatte/eyeball/blob/01594bb93fc7029b1ba0a2097080cfebf9ad1655/LICENSE",
+        "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+      }
+    }
+  },
+  {
+    "origin": "https://codeberg.org/jplatte/eyeball",
+    "revision": "a821688be67c7573a19b6b145ff8678fece4d41b",
+    "crates": {
+      "eyeball-im-0.9.1": {
+        "path_in_vcs": "eyeball-im"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://codeberg.org/jplatte/eyeball/src/commit/a821688be67c7573a19b6b145ff8678fece4d41b/LICENSE",
+        "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/matrix-org/matrix-pickle",
+    "revision": "3eb007eae1ca87e3a3683c99a58fd19289abae52",
+    "crates": {
+      "matrix-pickle-0.2.3": {
+        "path_in_vcs": "crates/matrix-pickle"
+      },
+      "matrix-pickle-derive-0.2.3": {
+        "path_in_vcs": "crates/matrix-pickle-derive"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/matrix-org/matrix-pickle/blob/3eb007eae1ca87e3a3683c99a58fd19289abae52/LICENSE",
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/matrix-org/matrix-rust-sdk",
+    "revision": "b18166c68bb958a21f0bca8b2d8320cb53583362",
+    "crates": {
+      "matrix-sdk-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk"
+      },
+      "matrix-sdk-base-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk-base"
+      },
+      "matrix-sdk-common-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk-common"
+      },
+      "matrix-sdk-crypto-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk-crypto"
+      },
+      "matrix-sdk-sqlite-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk-sqlite"
+      },
+      "matrix-sdk-store-encryption-0.19.1": {
+        "path_in_vcs": "crates/matrix-sdk-store-encryption"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/matrix-org/matrix-rust-sdk/blob/b18166c68bb958a21f0bca8b2d8320cb53583362/LICENSE",
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ramosbugs/oauth2-rs",
+    "revision": "72ce74401c26eb4dc85dcbfde587bbcfc149e3ae",
+    "crates": {
+      "oauth2-reqwest-0.1.0-alpha.3": {
+        "path_in_vcs": "oauth2-reqwest"
+      }
+    },
+    "notices": {
+      "LICENSE-MIT": {
+        "url": "https://github.com/ramosbugs/oauth2-rs/blob/72ce74401c26eb4dc85dcbfde587bbcfc149e3ae/LICENSE-MIT",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+      }
+    }
+  },
+  {
+    "origin": "https://codeberg.org/jplatte/readlock",
+    "revision": "4c54a425444b826a7c8b687a53cad547a1b5f20b",
+    "crates": {
+      "readlock-0.1.11": {
+        "path_in_vcs": "readlock"
+      },
+      "readlock-tokio-0.1.6": {
+        "path_in_vcs": "readlock-tokio"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://codeberg.org/jplatte/readlock/src/commit/4c54a425444b826a7c8b687a53cad547a1b5f20b/LICENSE",
+        "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "84051b5ddddfb0eabddcf69460627b7ed97bc551",
+    "crates": {
+      "ruma-0.17.0": {
+        "path_in_vcs": "crates/ruma"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/84051b5ddddfb0eabddcf69460627b7ed97bc551/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "82323865e0974badb1a150d105f47a82d57a8ad2",
+    "crates": {
+      "ruma-client-api-0.25.0": {
+        "path_in_vcs": "crates/ruma-client-api"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/82323865e0974badb1a150d105f47a82d57a8ad2/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "7fe9602caf6ec12e01f488757edb8d99c6bcd16e",
+    "crates": {
+      "ruma-common-0.20.0": {
+        "path_in_vcs": "crates/ruma-common"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/7fe9602caf6ec12e01f488757edb8d99c6bcd16e/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "afb1e8af8f07a715a0c0fc008cc7bad6fe01fc29",
+    "crates": {
+      "ruma-events-0.35.0": {
+        "path_in_vcs": "crates/ruma-events"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/afb1e8af8f07a715a0c0fc008cc7bad6fe01fc29/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "3b9bb665f129d418fe01e39bebc22fbe759f41f7",
+    "crates": {
+      "ruma-identifiers-validation-0.12.1": {
+        "path_in_vcs": "crates/ruma-identifiers-validation"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/3b9bb665f129d418fe01e39bebc22fbe759f41f7/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/ruma/ruma",
+    "revision": "d2f03b3b3d83a840bb7ad42a508e0081781ef9ba",
+    "crates": {
+      "ruma-macros-0.20.0": {
+        "path_in_vcs": "crates/ruma-macros"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/ruma/ruma/blob/d2f03b3b3d83a840bb7ad42a508e0081781ef9ba/LICENSE",
+        "sha256": "89807acf2309bd285f033404ee78581602f3cd9b819a16ac2f0e5f60ff4a473e"
+      }
+    }
+  },
+  {
+    "origin": "https://github.com/jlucaso1/whatsapp-rust",
+    "revision": "f8165f282008935732e0b26d6f5cca5038ecd222",
+    "crates": {
+      "wacore-0.7.0": {
+        "path_in_vcs": "wacore"
+      },
+      "wacore-appstate-0.7.0": {
+        "path_in_vcs": "wacore/appstate"
+      },
+      "wacore-binary-0.7.0": {
+        "path_in_vcs": "wacore/binary"
+      },
+      "wacore-derive-0.7.0": {
+        "path_in_vcs": "wacore/derive"
+      },
+      "wacore-libsignal-0.7.0": {
+        "path_in_vcs": "wacore/libsignal"
+      },
+      "wacore-noise-0.7.0": {
+        "path_in_vcs": "wacore/noise"
+      },
+      "waproto-0.7.0": {
+        "path_in_vcs": "waproto"
+      },
+      "whatsapp-rust-sqlite-storage-0.7.0": {
+        "path_in_vcs": "storages/sqlite-storage"
+      },
+      "whatsapp-rust-tokio-transport-0.7.0": {
+        "path_in_vcs": "transports/tokio-transport"
+      },
+      "whatsapp-rust-ureq-http-client-0.7.0": {
+        "path_in_vcs": "http_clients/ureq-client"
+      }
+    },
+    "notices": {
+      "LICENSE": {
+        "url": "https://github.com/jlucaso1/whatsapp-rust/blob/f8165f282008935732e0b26d6f5cca5038ecd222/LICENSE",
+        "sha256": "6613c7e94b361fdd87fbfe7f03e0344f926066f51f37936ec09a55dd4328dc23"
+      }
+    }
+  }
+]
