@@ -89,6 +89,14 @@ pub(crate) fn settings(config: &Value) -> Result<Option<Settings>> {
     Ok(Some(settings))
 }
 
+/// Check only the local receipt directory for enabled reviews; no credentials or client.
+pub(crate) fn validate_receipt_directory(config: &Value) -> Result<()> {
+    let Some(settings) = settings(config)? else {
+        return Ok(());
+    };
+    check_receipt_dir(settings.receipt_dir.as_deref().expect("validated"))
+}
+
 fn valid_name(name: &str) -> bool {
     name.len() <= 64
         && name.split('-').all(|part| {
@@ -161,6 +169,14 @@ fn check_receipt_dir(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(unix))]
+const UNIX_REQUIRED: &str = "Telegram Skillstore review currently requires a Unix host";
+
+#[cfg(not(unix))]
+fn check_receipt_dir(_path: &std::path::Path) -> Result<()> {
+    bail!(UNIX_REQUIRED);
+}
+
 impl SkillReviews {
     #[cfg(unix)]
     pub(super) fn new(settings: Settings) -> Result<Self> {
@@ -187,7 +203,7 @@ impl SkillReviews {
 
     #[cfg(not(unix))]
     pub(super) fn new(_settings: Settings) -> Result<Self> {
-        bail!("Telegram Skillstore review currently requires a Unix host");
+        bail!(UNIX_REQUIRED);
     }
 
     async fn rpc(&self, method: &str, params: Value) -> Result<Value> {

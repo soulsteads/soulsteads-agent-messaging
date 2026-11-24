@@ -146,6 +146,51 @@ fn validates_mattermost_receipt_directory_without_initializing_it() {
     assert_eq!(fs::read_to_string(&path).unwrap(), fixture);
 }
 
+#[cfg(unix)]
+#[test]
+fn validates_telegram_skillstore_receipt_directory_without_credentials() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let config = root.join("soulsteads-messaging.json");
+    let receipts = root.join("synthetic_private");
+    let token_path = root.join("reviewer-token-not-provisioned");
+    let fixture = serde_json::json!({"telegram": {
+        "enabled": true,
+        "allowedUsers": ["1"],
+        "skillReviews": {
+            "enabled": true,
+            "registryUrl": "http://127.0.0.1:1",
+            "reviewerUserId": 1,
+            "reviewerTokenFile": token_path,
+            "receiptDir": receipts,
+        },
+    }})
+    .to_string();
+    fs::write(&config, &fixture).unwrap();
+    let args = ["--settings", "validate", "--json"];
+    let category = "skillstore_receipt_directory";
+
+    failure(run(&root, &args, &[]), category);
+    assert!(!receipts.exists());
+
+    fs::create_dir(&receipts).unwrap();
+    fs::set_permissions(&receipts, fs::Permissions::from_mode(0o755)).unwrap();
+    failure(run(&root, &args, &[]), category);
+    fs::set_permissions(&receipts, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(success(run(&root, &args, &[]))["valid"], true);
+
+    let target = root.join("private-receipts");
+    fs::rename(&receipts, &target).unwrap();
+    symlink(&target, &receipts).unwrap();
+    failure(run(&root, &args, &[]), category);
+    assert_eq!(fs::read_link(&receipts).unwrap(), target);
+    assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+    assert!(!token_path.exists());
+    assert_eq!(fs::read_to_string(&config).unwrap(), fixture);
+}
+
 #[cfg(all(unix, feature = "agent-network"))]
 #[test]
 fn validates_agent_review_queue_without_initializing_it() {
