@@ -15,6 +15,7 @@ pub use adapters::opencode::native_server;
 mod private_journal;
 mod profile;
 pub mod runtime;
+pub mod service;
 pub mod settings;
 pub mod store;
 pub mod tools;

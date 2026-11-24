@@ -1,5 +1,5 @@
-use anyhow::{Result, bail};
-use clap::Parser;
+use anyhow::{Context, Result, bail};
+use clap::{ArgGroup, Parser, Subcommand};
 use soulsteads_messaging::{
     config::{self, boolean, string},
     connectors::http::Platform,
@@ -26,7 +26,7 @@ use cli_images::Console;
 struct Arguments {
     #[arg(long, value_enum, conflicts_with_all = ["config", "check_config", "serve", "no_images", "prompt"])]
     acp_adapter: Option<soulsteads_messaging::adapters::Kind>,
-    #[arg(long)]
+    #[arg(long, global = true)]
     config: Option<PathBuf>,
     #[arg(long, visible_alias = "check")]
     check_config: bool,
@@ -36,6 +36,31 @@ struct Arguments {
     no_images: bool,
     #[arg(trailing_var_arg = true)]
     prompt: Vec<String>,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    Service {
+        #[command(subcommand)]
+        command: ServiceCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ServiceCommand {
+    #[command(group(ArgGroup::new("scope").required(true).args(["user", "system"])))]
+    Install {
+        #[arg(long)]
+        user: bool,
+        #[arg(long)]
+        system: bool,
+        #[arg(long)]
+        run_as: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -150,6 +175,17 @@ async fn start() -> Result<()> {
         return Ok(());
     }
     let arguments = Arguments::parse();
+    if let Some(command) = arguments.command {
+        if arguments.acp_adapter.is_some()
+            || arguments.check_config
+            || arguments.serve
+            || arguments.no_images
+            || !arguments.prompt.is_empty()
+        {
+            bail!("service installation cannot be combined with gateway execution options");
+        }
+        return run_command(command, arguments.config);
+    }
     if let Some(adapter) = arguments.acp_adapter {
         return adapter.serve().await;
     }
@@ -352,6 +388,37 @@ async fn start() -> Result<()> {
     }
     bridge.shutdown().await?;
     result
+}
+
+fn run_command(command: Command, config: Option<PathBuf>) -> Result<()> {
+    match command {
+        Command::Service {
+            command:
+                ServiceCommand::Install {
+                    user,
+                    system,
+                    run_as,
+                    dry_run,
+                },
+        } => {
+            let scope = match (user, system) {
+                (true, false) => soulsteads_messaging::service::Scope::User,
+                (false, true) => soulsteads_messaging::service::Scope::System,
+                _ => bail!("choose exactly one of --user or --system"),
+            };
+            let config = config.context("service install requires --config PATH")?;
+            let message = soulsteads_messaging::service::install(
+                soulsteads_messaging::service::InstallRequest {
+                    scope,
+                    run_as,
+                    dry_run,
+                    config,
+                },
+            )?;
+            println!("{message}");
+            Ok(())
+        }
+    }
 }
 
 async fn supervise(
