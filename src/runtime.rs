@@ -925,6 +925,7 @@ pub(crate) fn normalize_agent_homes(
 pub struct Bridge {
     pub config: Value,
     pub env: BTreeMap<String, String>,
+    inherit_opencode_env: bool,
     workspace: PathBuf,
     store: Store,
     mattermost_receipts: Option<crate::mattermost_receipts::Store>,
@@ -1041,6 +1042,16 @@ impl Bridge {
     pub fn new(config: Value, env: BTreeMap<String, String>, workspace: PathBuf) -> Result<Self> {
         Self::new_with_restart_dispatcher(config, env, workspace, Arc::new(SystemdUserRestart))
     }
+    /// Use the same scoped child environment policy for every backend in a gateway.
+    pub fn new_for_gateway(
+        config: Value,
+        env: BTreeMap<String, String>,
+        workspace: PathBuf,
+    ) -> Result<Self> {
+        let mut bridge = Self::new(config, env, workspace)?;
+        bridge.inherit_opencode_env = false;
+        Ok(bridge)
+    }
     pub fn new_with_restart_dispatcher(
         mut config: Value,
         env: BTreeMap<String, String>,
@@ -1081,6 +1092,7 @@ impl Bridge {
         Ok(Self {
             config,
             env,
+            inherit_opencode_env: true,
             workspace,
             store,
             mattermost_receipts,
@@ -2277,7 +2289,7 @@ impl Bridge {
                 args,
                 cwd: directory.to_owned(),
                 env,
-                inherit_env: backend == "opencode",
+                inherit_env: backend == "opencode" && self.inherit_opencode_env,
                 timeout: Duration::from_secs(300),
             },
             servers,

@@ -83,6 +83,12 @@ impl Settings {
                 ));
             }
         };
+        if supplied.get("agents").is_some() {
+            return Err(error(
+                "gateway_manifest",
+                "Use --check-config for a multi-agent gateway manifest.",
+            ));
+        }
         let defaults = config::defaults();
         for (key, value) in defaults.as_object().expect("object defaults") {
             if value.is_object()
@@ -276,7 +282,7 @@ fn default_paths(value: &Value, path: String, paths: &mut BTreeSet<String>) {
 
 const DUPLICATE: &str = "duplicate settings object member";
 
-fn parse_object(input: &str) -> Result<Value, Error> {
+pub(crate) fn parse_object(input: &str) -> Result<Value, Error> {
     let StrictValue(value) = serde_json::from_str(input).map_err(|failure| {
         if failure.to_string().starts_with(DUPLICATE) {
             error(

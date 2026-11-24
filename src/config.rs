@@ -45,16 +45,11 @@ impl Loader {
                     .map_err(|_| anyhow::anyhow!("Cannot parse explicit configuration"))?
             }
             Ok(input) => {
-                let opts_into_agent_tools = serde_json::from_str::<Value>(&input)
-                    .ok()
-                    .and_then(|value| {
-                        value
-                            .get("agentMessaging")
-                            .and_then(|value| value.get("tools"))
-                            .cloned()
-                    })
-                    .is_some();
-                if opts_into_agent_tools {
+                let strict = serde_json::from_str::<Value>(&input).is_ok_and(|value| {
+                    value.get("agents").is_some()
+                        || value.pointer("/agentMessaging/tools").is_some()
+                });
+                if strict {
                     load(&input, env)?
                 } else {
                     load(&input, env).unwrap_or_else(|_| defaults())
@@ -346,10 +341,13 @@ pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
 }
 
 pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
-    normalize(
-        serde_json::from_str(input).unwrap_or_else(|_| serde_json::json!({})),
-        env,
-    )
+    let supplied: Value = serde_json::from_str(input).unwrap_or_else(|_| serde_json::json!({}));
+    if supplied.get("agents").is_some() {
+        // Validate duplicate members before losing them to Value's map semantics.
+        // Leave interpolation and defaults to each individual agent config.
+        return Ok(crate::settings::parse_object(input)?);
+    }
+    normalize(supplied, env)
 }
 
 pub(crate) fn normalize(mut supplied: Value, env: &BTreeMap<String, String>) -> Result<Value> {

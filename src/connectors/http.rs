@@ -486,11 +486,14 @@ impl Platform {
         }
         Ok(())
     }
-    pub async fn run(
-        mut self,
-        bridge: Arc<Bridge>,
-        mut shutdown: watch::Receiver<bool>,
-    ) -> Result<()> {
+    pub async fn run(self, bridge: Arc<Bridge>, shutdown: watch::Receiver<bool>) -> Result<()> {
+        self.identify()
+            .await?
+            .run_identified(bridge, shutdown)
+            .await
+    }
+
+    pub async fn identify(mut self) -> Result<Self> {
         let identity = self
             .api(
                 if matches!(self.kind.as_str(), "slack" | "telegram") {
@@ -513,6 +516,14 @@ impl Platform {
             &identity["id"]
         });
         self.username = scalar(&identity["username"]);
+        Ok(self)
+    }
+
+    pub async fn run_identified(
+        self,
+        bridge: Arc<Bridge>,
+        mut shutdown: watch::Receiver<bool>,
+    ) -> Result<()> {
         let capacity = Arc::new(Semaphore::new(64));
         let mut tasks = tokio::task::JoinSet::new();
         if self.kind == "telegram" {
