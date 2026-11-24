@@ -6,8 +6,14 @@ on:
   pull_request:
     paths:
       - .github/workflows/release.yml
+      - .cargo/**
       - Cargo.lock
       - Cargo.toml
+      - build.rs
+      - src/**
+      - assets/**
+      - LICENSE
+      - NOTICE
       - scripts/release-notices/**
       - tests/test_release_assets.py
 
