@@ -88,6 +88,46 @@ The first build downloads dependencies and can take a while.
 
   For all command-line options, run `./target/release/soulsteads-messaging --help`.
 
+### Inspect and validate settings locally
+
+```sh
+./target/release/soulsteads-messaging --settings --help
+./target/release/soulsteads-messaging --settings list
+./target/release/soulsteads-messaging --settings get /web/port --json
+./target/release/soulsteads-messaging --settings validate --config ./custom.json --json
+```
+
+Settings reads `soulsteads-messaging.json` in the current directory by default.
+An absent default file uses the embedded defaults. Settings accepts readable,
+regular config and project dotenv files of up to 1 MiB each, including symbolic
+links to those files. Settings uses the usual project dotenv and process
+environment precedence.
+
+`list` reports canonical default paths and selected, documented optional
+settings present in the file. `get` accepts a JSON Pointer from that list.
+The output contains paths and source labels only. Arrays are listed as a
+single setting. Legacy `toolMessages` and `web` arrays replace their default
+child paths with `/toolMessages` and `/web`, respectively. An array-valued
+`web` section does not enable the Web connector; use an object to configure it
+or apply Web environment overrides. Credential fields and arbitrary input keys
+are omitted.
+`configured` means the file declares the setting, including declarations
+that use an environment placeholder or a supported legacy alias. `env_override`
+means the startup override logic applied an environment value to that setting.
+`default` identifies an embedded default path with neither of those sources.
+The labels describe declarations and overrides, so normalization can still
+repair a configured value. Environment settings consumed separately by a
+connector or the access policy are outside this inventory.
+
+`validate` checks strict JSON, normalization, connector access policy, receipt
+and review queue directory existence, ownership, and permissions (without
+locking or reading the journals), ACP agent homes, agent messaging configuration,
+the session store path requirement, enabled Web port range, and build support for enabled
+Matrix and WhatsApp connectors. Successful JSON output is `{"valid":true}`.
+Failures exit nonzero with a sanitized category and guidance on stderr and empty
+stdout. Validation performs local checks only. Connector connectivity,
+credentials, and service status are outside the scope of validation.
+
 > [!WARNING]
 > **Enabled remote connectors require an explicit access policy.** Set
 > `allowedUsers` to your own user ID. An empty list is rejected at startup and by

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use clap::Parser;
 use soulsteads_messaging::{
     config::{self, boolean, string},
@@ -7,6 +7,7 @@ use soulsteads_messaging::{
 };
 use std::{
     collections::BTreeMap,
+    ffi::OsString,
     path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
@@ -17,7 +18,11 @@ mod cli_images;
 use cli_images::Console;
 
 #[derive(Parser)]
-#[command(version, about = "Native ACP chat bridge")]
+#[command(
+    version,
+    about = "Native ACP chat bridge",
+    after_help = "Read-only settings: soulsteads-messaging --settings <list|validate|get> --help"
+)]
 struct Arguments {
     #[arg(long, value_enum, conflicts_with_all = ["config", "check_config", "serve", "no_images", "prompt"])]
     acp_adapter: Option<soulsteads_messaging::adapters::Kind>,
@@ -33,8 +38,107 @@ struct Arguments {
     prompt: Vec<String>,
 }
 
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum SettingsOperation {
+    List,
+    Validate,
+    Get,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Inspect and validate local settings",
+    disable_help_subcommand = true
+)]
+struct SettingsArguments {
+    #[arg(long, value_enum, required = true, num_args = 0..=1)]
+    settings: Option<SettingsOperation>,
+    #[arg(long)]
+    config: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+    #[arg(value_name = "JSON_POINTER", required_if_eq("settings", "get"))]
+    path: Option<String>,
+}
+
+fn settings_requested(args: &[OsString]) -> bool {
+    let marker = args
+        .iter()
+        .skip(1)
+        .take_while(|arg| *arg != "--")
+        .any(|arg| arg == "--settings" || arg.as_encoded_bytes().starts_with(b"--settings="));
+    // The legacy trailing prompt can contain option-shaped words. The MCP
+    // proxy has no prompt, so a mixed invocation always reaches Settings.
+    marker
+        && (args.get(1).is_some_and(|arg| arg == "--mcp-sse-proxy")
+            || Arguments::try_parse_from(args).is_err())
+}
+
+fn run_settings(args: Vec<OsString>) -> Result<()> {
+    const USAGE: &str = "settings_usage: Use --settings list, validate, or get JSON_POINTER with optional --config FILE and --json.";
+    let arguments = match SettingsArguments::try_parse_from(args) {
+        Ok(arguments) => arguments,
+        Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => error.exit(),
+        Err(_) => bail!(USAGE),
+    };
+    let Some(operation) = arguments.settings else {
+        bail!(USAGE);
+    };
+    if arguments.path.is_some() && !matches!(operation, SettingsOperation::Get) {
+        bail!("settings_usage: A JSON Pointer is accepted only with --settings get.");
+    }
+    let cwd = std::env::current_dir()
+        .map_err(|_| anyhow::anyhow!("config_read: Cannot determine the current directory."))?;
+    let ambient = std::env::vars_os()
+        .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)))
+        .collect();
+    let settings =
+        soulsteads_messaging::settings::Settings::load(&cwd, arguments.config.as_deref(), ambient)?;
+    match operation {
+        SettingsOperation::List => {
+            let entries = settings.list();
+            if arguments.json {
+                println!("{}", serde_json::json!({ "settings": entries }));
+            } else {
+                for entry in entries {
+                    println!("{}\t{}", entry.path, entry.source.as_str());
+                }
+            }
+        }
+        SettingsOperation::Get => {
+            let entry = settings.get(arguments.path.as_deref().unwrap_or_default())?;
+            if arguments.json {
+                println!("{}", serde_json::json!(entry));
+            } else {
+                println!("{}\t{}", entry.path, entry.source.as_str());
+            }
+        }
+        SettingsOperation::Validate => {
+            settings.validate()?;
+            if arguments.json {
+                println!(r#"{{"valid":true}}"#);
+            } else {
+                println!("Local settings validation passed.");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args_os().collect();
+    if settings_requested(&args) {
+        if let Err(error) = run_settings(args) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    run_bridge();
+}
+
 #[tokio::main]
-async fn main() {
+async fn run_bridge() {
     if let Err(_error) = start().await {
         eprintln!("Chat bridge failed; verify local configuration and connector availability.");
         std::process::exit(1);
@@ -107,6 +211,8 @@ async fn start() -> Result<()> {
         }
         return bridge.shutdown().await;
     }
+    let web_port = config::enabled_web_port(&configuration)?;
+    config::validate_platform_sdk_support(&configuration)?;
     let (shutdown, receiver) = tokio::sync::watch::channel(false);
     let mut tasks = tokio::task::JoinSet::new();
     for platform in ["telegram", "mattermost", "slack", "discord"] {
@@ -147,14 +253,8 @@ async fn start() -> Result<()> {
         let receiver = receiver.clone();
         tasks.spawn(async move { platform.run(bridge, receiver).await });
     }
-    if boolean(&configuration["web"], "enabled") {
-        let address = format!(
-            "{}:{}",
-            string(&configuration["web"], "host"),
-            configuration["web"]["port"]
-                .as_u64()
-                .context("Invalid web port")?
-        );
+    if let Some(port) = web_port {
+        let address = format!("{}:{port}", string(&configuration["web"], "host"));
         let listener = tokio::net::TcpListener::bind(address).await?;
         let router =
             soulsteads_messaging::web::router(bridge.clone(), configuration["web"].clone());
@@ -168,41 +268,33 @@ async fn start() -> Result<()> {
                 .map_err(Into::into)
         });
     }
+    #[cfg(feature = "platform-sdks")]
     for platform in ["matrix", "whatsapp"] {
         if !boolean(&configuration[platform], "enabled") {
             continue;
         }
-        #[cfg(not(feature = "platform-sdks"))]
-        {
-            bail!("Enabled connector requires platform-sdks build feature");
-        }
-        #[cfg(feature = "platform-sdks")]
-        {
-            let bridge = bridge.clone();
-            let receiver = receiver.clone();
-            if platform == "matrix" {
-                let storage = environment
-                    .get("MATRIX_STORAGE_PATH")
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| home.join(".local/share/opencode-matrix-bot"));
-                let client = soulsteads_messaging::connectors::matrix::connect(
-                    &configuration[platform],
-                    &storage,
-                )
-                .await?;
-                tasks.spawn(async move {
-                    soulsteads_messaging::connectors::matrix::run(client, bridge, receiver).await
-                });
-            } else {
-                let bot = soulsteads_messaging::connectors::whatsapp::build(
-                    &configuration[platform],
-                    bridge,
-                )
-                .await?;
-                tasks.spawn(async move {
-                    soulsteads_messaging::connectors::whatsapp::run(bot, receiver).await
-                });
-            }
+        let bridge = bridge.clone();
+        let receiver = receiver.clone();
+        if platform == "matrix" {
+            let storage = environment
+                .get("MATRIX_STORAGE_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.join(".local/share/opencode-matrix-bot"));
+            let client = soulsteads_messaging::connectors::matrix::connect(
+                &configuration[platform],
+                &storage,
+            )
+            .await?;
+            tasks.spawn(async move {
+                soulsteads_messaging::connectors::matrix::run(client, bridge, receiver).await
+            });
+        } else {
+            let bot =
+                soulsteads_messaging::connectors::whatsapp::build(&configuration[platform], bridge)
+                    .await?;
+            tasks.spawn(async move {
+                soulsteads_messaging::connectors::whatsapp::run(bot, receiver).await
+            });
         }
     }
     if tasks.is_empty() {

@@ -23,6 +23,27 @@ mod platform {
     }
     impl Disk {
         pub(crate) fn open(path: &Path, filename: &'static str, limit: usize) -> Result<Self> {
+            let directory = Self::open_directory(path)?;
+            directory
+                .try_lock()
+                .context("Journal directory is already in use")?;
+            let disk = Self {
+                path: path.into(),
+                directory,
+                filename,
+                limit,
+            };
+            disk.rebind()?;
+            Ok(disk)
+        }
+
+        /// Check directory admission without taking a lock or opening the journal.
+        pub(crate) fn validate_directory(path: &Path) -> Result<()> {
+            let directory = Self::open_directory(path)?;
+            Self::check_binding(path, &directory)
+        }
+
+        fn open_directory(path: &Path) -> Result<File> {
             ensure!(
                 path.is_absolute() && path != Path::new("/") && path.canonicalize()? == path,
                 "Journal directory must be an existing absolute, non-symlink directory"
@@ -37,26 +58,17 @@ mod platform {
                 metadata.uid() == unsafe { libc::geteuid() } && metadata.mode() & 0o777 == 0o700,
                 "Journal directory must be owned by the bridge and have mode 0700"
             );
-            directory
-                .try_lock()
-                .context("Journal directory is already in use")?;
-            let disk = Self {
-                path: path.into(),
-                directory,
-                filename,
-                limit,
-            };
-            disk.rebind()?;
-            Ok(disk)
+            Ok(directory)
         }
 
         fn rebind(&self) -> Result<()> {
-            ensure!(
-                self.path.canonicalize()? == self.path,
-                "Journal directory changed"
-            );
-            let named = fs::symlink_metadata(&self.path)?;
-            let opened = self.directory.metadata()?;
+            Self::check_binding(&self.path, &self.directory)
+        }
+
+        fn check_binding(path: &Path, directory: &File) -> Result<()> {
+            ensure!(path.canonicalize()? == path, "Journal directory changed");
+            let named = fs::symlink_metadata(path)?;
+            let opened = directory.metadata()?;
             ensure!(
                 named.is_dir()
                     && named.dev() == opened.dev()
@@ -155,6 +167,9 @@ mod platform {
     pub(crate) struct Disk;
     impl Disk {
         pub(crate) fn open(_: &Path, _: &'static str, _: usize) -> Result<Self> {
+            anyhow::bail!("Private journals require Unix")
+        }
+        pub(crate) fn validate_directory(_: &Path) -> Result<()> {
             anyhow::bail!("Private journals require Unix")
         }
         pub(crate) fn read(&self) -> Result<Option<Vec<u8>>> {

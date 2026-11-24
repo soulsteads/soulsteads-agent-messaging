@@ -1,6 +1,11 @@
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    fs::{self, OpenOptions},
+    io::{self, Read},
+    path::Path,
+};
 
 pub fn defaults() -> Value {
     serde_json::from_str(include_str!("defaults.json")).expect("embedded default configuration")
@@ -62,9 +67,76 @@ impl Loader {
         Ok(loaded)
     }
 }
+
+const SETTINGS_FILE_LIMIT: u64 = 1024 * 1024;
+
+pub(crate) fn read_settings_file(path: &Path) -> io::Result<Vec<u8>> {
+    let check_file = |metadata: fs::Metadata| {
+        if !metadata.is_file() || metadata.len() > SETTINGS_FILE_LIMIT {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid settings file type or size",
+            ));
+        }
+        Ok(())
+    };
+    check_file(fs::metadata(path)?)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    // The path may have changed between metadata and open.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+    let file = options.open(path)?;
+    check_file(file.metadata()?)?;
+    let mut bytes = Vec::new();
+    file.take(SETTINGS_FILE_LIMIT + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > SETTINGS_FILE_LIMIT {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Settings file exceeds size limit",
+        ));
+    }
+    Ok(bytes)
+}
+
 pub fn project_environment(
-    cwd: &std::path::Path,
+    cwd: &Path,
     ambient: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>> {
+    project_environment_with(cwd, ambient, |path| {
+        // Preserve legacy startup behavior, including empty /dev/null links.
+        let metadata = match fs::metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => bail!("Cannot read environment file"),
+        };
+        if metadata.len() > SETTINGS_FILE_LIMIT {
+            bail!("Environment file exceeds size limit");
+        }
+        dotenvy::from_path_iter(path)
+            .map(Some)
+            .map_err(|_| anyhow::anyhow!("Cannot parse environment file"))
+    })
+}
+
+pub(crate) fn settings_environment(
+    cwd: &Path,
+    ambient: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>> {
+    project_environment_with(cwd, ambient, |path| match read_settings_file(path) {
+        Ok(bytes) => Ok(Some(dotenvy::from_read_iter(io::Cursor::new(bytes)))),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(_) => bail!("Cannot read environment file"),
+    })
+}
+
+fn project_environment_with<R: Read>(
+    cwd: &Path,
+    ambient: BTreeMap<String, String>,
+    read: impl Fn(&Path) -> Result<Option<dotenvy::Iter<R>>>,
 ) -> Result<BTreeMap<String, String>> {
     let mut result = ambient.clone();
     let mut files = vec![".env".to_owned()];
@@ -79,17 +151,9 @@ pub fn project_environment(
         files.push(".env.local".into());
     }
     for file in files {
-        let path = cwd.join(file);
-        let metadata = match std::fs::metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(_) => bail!("Cannot read environment file"),
+        let Some(entries) = read(&cwd.join(file))? else {
+            continue;
         };
-        if metadata.len() > 1024 * 1024 {
-            bail!("Environment file exceeds size limit");
-        }
-        let entries = dotenvy::from_path_iter(path)
-            .map_err(|_| anyhow::anyhow!("Cannot parse environment file"))?;
         for entry in entries {
             let (key, value) =
                 entry.map_err(|_| anyhow::anyhow!("Cannot parse environment assignment"))?;
@@ -100,7 +164,39 @@ pub fn project_environment(
     }
     Ok(result)
 }
+
+/// Returns the configured port for an enabled Web connector without binding.
+pub fn enabled_web_port(config: &Value) -> Result<Option<u16>> {
+    if !boolean(&config["web"], "enabled") {
+        return Ok(None);
+    }
+    config["web"]["port"]
+        .as_u64()
+        .and_then(|port| u16::try_from(port).ok())
+        .map(Some)
+        .context("Invalid web port")
+}
+
+/// Checks whether this build supports the enabled SDK connectors.
+pub fn validate_platform_sdk_support(config: &Value) -> Result<()> {
+    if !cfg!(feature = "platform-sdks")
+        && ["matrix", "whatsapp"]
+            .iter()
+            .any(|platform| boolean(&config[*platform], "enabled"))
+    {
+        bail!("Enabled connector requires platform-sdks build feature");
+    }
+    Ok(())
+}
 pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String>) -> Result<()> {
+    apply_runtime_overrides_with(config, env, |_, _| {})
+}
+
+pub(crate) fn apply_runtime_overrides_with(
+    config: &mut Value,
+    env: &BTreeMap<String, String>,
+    mut applied: impl FnMut(&str, &str),
+) -> Result<()> {
     for (platform, field, name, environment_first) in [
         ("matrix", "accessToken", "MATRIX_ACCESS_TOKEN", false),
         ("matrix", "password", "MATRIX_PASSWORD", false),
@@ -119,23 +215,33 @@ pub fn apply_runtime_overrides(config: &mut Value, env: &BTreeMap<String, String
                 bail!("Connector configuration must be an object");
             }
             config[platform][field] = value.clone().into();
+            applied(platform, field);
         }
     }
     if let Some(port) = env.get("WEB_PORT").filter(|value| !value.is_empty()) {
+        if !config["web"].is_object() {
+            bail!("Web environment overrides require a web configuration object");
+        }
         let port = port
             .parse::<u16>()
             .map_err(|_| anyhow::anyhow!("WEB_PORT is invalid"))?;
         config["web"]["port"] = port.into();
+        applied("web", "port");
     }
     if let Some(origins) = env
         .get("WEB_ALLOWED_ORIGINS")
         .filter(|value| !value.is_empty())
     {
+        if !config["web"].is_object() {
+            bail!("Web environment overrides require a web configuration object");
+        }
         config["web"]["allowedOrigins"] = crate::runtime::csv(origins).into();
+        applied("web", "allowedOrigins");
     }
     if let Some(value) = env.get("WHATSAPP_RESPOND_TO_OTHERS") {
         config["whatsapp"]["respondToOthers"] =
             (!["0", "false", "no", "off"].contains(&value.to_lowercase().as_str())).into();
+        applied("whatsapp", "respondToOthers");
     }
     Ok(())
 }
@@ -240,7 +346,13 @@ pub(crate) fn validate_agent_tools(config: &Value) -> Result<()> {
 }
 
 pub fn load(input: &str, env: &BTreeMap<String, String>) -> Result<Value> {
-    let mut supplied: Value = serde_json::from_str(input).unwrap_or_else(|_| serde_json::json!({}));
+    normalize(
+        serde_json::from_str(input).unwrap_or_else(|_| serde_json::json!({})),
+        env,
+    )
+}
+
+pub(crate) fn normalize(mut supplied: Value, env: &BTreeMap<String, String>) -> Result<Value> {
     if !supplied.is_object() {
         bail!("configuration must be an object");
     }
