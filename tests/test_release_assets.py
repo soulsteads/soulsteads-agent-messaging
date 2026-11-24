@@ -27,6 +27,21 @@ def publisher_script():
 
 
 @unittest.skipUnless(WORKFLOW.is_file(), "requires the source checkout's release workflow")
+class ReleaseTriggerTests(unittest.TestCase):
+    def test_pull_request_paths_cover_release_inputs(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        paths = re.search(r"^  pull_request:\n    paths:\n((?:      - [^\n]+\n)+)",
+                          workflow, re.MULTILINE)
+        self.assertIsNotNone(paths, "missing release packaging pull request path filters")
+        patterns = [line.removeprefix("      - ").strip("'\"") for line in paths[1].splitlines()]
+        self.assertCountEqual(patterns, (
+            ".github/workflows/release.yml", ".cargo/**", "Cargo.lock", "Cargo.toml", "build.rs",
+            "src/**", "assets/**", "LICENSE", "NOTICE", "scripts/release-notices/**",
+            "tests/test_release_assets.py",
+        ))
+
+
+@unittest.skipUnless(WORKFLOW.is_file(), "requires the source checkout's release workflow")
 class ReleaseAssetTests(unittest.TestCase):
     def setUp(self):
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
