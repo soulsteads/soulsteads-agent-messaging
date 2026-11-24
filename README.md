@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0" /></a>
-  <img src="https://img.shields.io/badge/version-0.3.0-orange" alt="Version 0.3.0" />
+  <img src="https://img.shields.io/badge/version-0.4.0-orange" alt="Version 0.4.0" />
   <img src="https://img.shields.io/badge/rust-2024-informational?logo=rust" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/status-early%20release-yellow" alt="Status: early release" />
 </p>
@@ -40,7 +40,7 @@ Rust/Cargo, Python 3.11+, a systemd user session, and a dedicated Telegram bot.
 > [!NOTE]
 > **Only Telegram has a guided setup, for Claude Code or Codex on Linux.**
 > Other platforms and agents need manual configuration. Connectors are included,
-> not preconfigured; each needs its own credentials. This is an early `0.2.0`
+> not preconfigured; each needs its own credentials. This is an early `0.4.0`
 > release, not a promise that every combination has been tested live.
 
 **Optional local agent tools:** With the `agent-network` build feature and an

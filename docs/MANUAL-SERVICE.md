@@ -142,15 +142,18 @@ configuration, or silently fall back to another identity when preparation fails.
 
 ## 3. Create private directories
 
-Choose one instance name for the service. Use `matrix` or `mattermost` for a
-standalone connector, or a distinct name such as `helper` for a combined service:
+Choose one instance name for the private state and configuration directories. Use
+`matrix` or `mattermost` for a standalone connector, or a distinct name such as
+`helper` for a combined service. The built-in installer owns the fixed
+`soulsteads-messaging.service` name, so it supports one installed service per
+user or system scope at a time:
 
 ```sh
 INSTANCE=matrix
 # For Mattermost, use INSTANCE=mattermost instead.
 ROOT="$HOME/.local/share/soulsteads-agent-messaging/$INSTANCE"
 CONFIG_DIR="$HOME/.config/soulsteads-agent-messaging/$INSTANCE"
-UNIT="soulsteads-messaging-$INSTANCE.service"
+UNIT="soulsteads-messaging.service"
 
 umask 077
 # Refuse an existing installation rather than overwrite it.
@@ -168,22 +171,22 @@ Run shell blocks in the same shell so these variables remain defined. Do not
 execute this block in a shell containing unsaved work if you need to retain it
 after a failed prerequisite check.
 
-In a local editor, create `$CONFIG_DIR/credentials.env` using the chosen platform
-guide. Never paste real tokens into chat, command arguments, screenshots, or Git.
-Use simple `NAME=value` assignments, not `export` commands or shell substitution.
+In a local editor, create `$ROOT/work/.env` using the chosen platform guide.
+Never paste real tokens into chat, command arguments, screenshots, or Git. Use
+simple `NAME=value` assignments, not `export` commands or shell substitution.
 Create `$CONFIG_DIR/bridge.json` from that guide's example, replacing every
 placeholder. Then protect both files:
 
 ```sh
-chmod 700 "$ROOT" "$CONFIG_DIR"
-chmod 600 "$CONFIG_DIR/credentials.env" "$CONFIG_DIR/bridge.json"
+chmod 700 "$ROOT" "$CONFIG_DIR" "$ROOT/work"
+chmod 600 "$ROOT/work/.env" "$CONFIG_DIR/bridge.json"
 ```
 
 The bridge loads `.env` files from its working directory, **not** from the
-`--config` file's parent. This procedure instead loads the private credential file
-through systemd. Do not add competing `.env` files under `$ROOT/work`; real
-process environment variables take precedence, and nonempty platform
-`*_ALLOWED_USERS` variables can override the JSON sender list.
+`--config` file's parent. The installer records that working directory but never
+copies credentials into the unit. Do not add other `.env` files under
+`$ROOT/work`; real process environment variables take precedence, and nonempty
+platform `*_ALLOWED_USERS` variables can override the JSON sender list.
 
 ## 4. Build and install a dedicated binary
 
@@ -217,50 +220,65 @@ state let you operate Matrix and Mattermost independently.
 
 ## 5. Install the unit without starting it
 
-Create `~/.config/systemd/user/$UNIT` with the instance name chosen above.
-Create the parent directory if absent.
-The following is a template: replace **every** `INSTANCE` with your chosen name,
-and replace `HARNESS_BIN_DIR` with the absolute directory containing your native
-CLI. Include other tool directories only if needed and trusted.
-
-```ini
-[Unit]
-Description=Soulsteads Agent Messaging (INSTANCE)
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=%h/.local/share/soulsteads-agent-messaging/INSTANCE/work
-EnvironmentFile=%h/.config/soulsteads-agent-messaging/INSTANCE/credentials.env
-Environment="PATH=HARNESS_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
-Environment="SESSION_BASE_DIR=%h/.local/share/soulsteads-agent-messaging/INSTANCE/state/sessions"
-Environment="MATRIX_STORAGE_PATH=%h/.local/share/soulsteads-agent-messaging/INSTANCE/state/matrix"
-ExecStartPre=%h/.local/share/soulsteads-agent-messaging/INSTANCE/bin/soulsteads-messaging --config %h/.config/soulsteads-agent-messaging/INSTANCE/bridge.json --check-config
-ExecStart=%h/.local/share/soulsteads-agent-messaging/INSTANCE/bin/soulsteads-messaging --config %h/.config/soulsteads-agent-messaging/INSTANCE/bridge.json --serve
-Restart=on-failure
-RestartSec=5
-UMask=0077
-
-[Install]
-WantedBy=default.target
-```
-
-`MATRIX_STORAGE_PATH` is unused by Mattermost and may be omitted from its unit.
-The explicit `sessionStorePath` in each platform example is resolved under
-`WorkingDirectory`. Do not share these paths between connector instances.
-
-Check the unit before activation:
+The built-in installer creates a unit for the exact binary, explicit config, and
+current working directory. It does not read the config or `.env` file while
+installing, so run it from the intended `$ROOT/work` directory. Preview the unit
+first; preview does not create a unit or call systemd:
 
 ```sh
+(
+  cd "$ROOT/work"
+  "$ROOT/bin/soulsteads-messaging" --config "$CONFIG_DIR/bridge.json" \
+    service install --user --dry-run
+)
+```
+
+After inspecting the preview, install it. This is an atomic no-clobber operation:
+if `soulsteads-messaging.service` already exists, the command refuses it rather
+than replacing an existing service. Installation requires Linux procfs and a unit
+directory filesystem that supports anonymous temporary files. The installer
+never enables, starts, or reloads a unit.
+
+```sh
+(
+  cd "$ROOT/work"
+  "$ROOT/bin/soulsteads-messaging" --config "$CONFIG_DIR/bridge.json" \
+    service install --user
+)
+```
+
+The generated unit has an explicit `WorkingDirectory`, starts the gateway with
+`--serve --config`, and contains no credentials or `EnvironmentFile`. Validate
+the configuration as the service user before activation, then check and reload the
+unit manually:
+
+```sh
+(
+  cd "$ROOT/work"
+  "$ROOT/bin/soulsteads-messaging" --config "$CONFIG_DIR/bridge.json" --check-config
+)
 systemd-analyze --user verify "$HOME/.config/systemd/user/$UNIT"
 systemctl --user daemon-reload
 systemctl --user cat "$UNIT"
 ```
 
-Inspect the unit locally; do not publish private installation details. The
-`ExecStartPre` check loads the explicit JSON and environment without starting
-connectors. **It does not validate tokens, allowlists, build-feature availability,
-server access, or harness authentication.** Those require the next steps.
+For a system unit, an administrator must make the installation decision and name
+the non-root account that will run the gateway. The installer always writes the
+fixed `/etc/systemd/system/soulsteads-messaging.service` target; it does not read
+the config as root. Ensure the selected account can read the private config and
+working directory before manually reloading the system manager:
+
+```sh
+(
+  cd "$ROOT/work"
+  sudo "$ROOT/bin/soulsteads-messaging" --config "$CONFIG_DIR/bridge.json" \
+    service install --system --run-as SERVICE_USER --dry-run
+)
+```
+
+Omit `--dry-run` only after reviewing the preview, then use `systemctl daemon-reload`
+and manually choose whether to start or enable `soulsteads-messaging.service`. Do
+not add credentials to the unit to make a system installation convenient.
 
 ## 6. Activate and verify
 
