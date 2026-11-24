@@ -877,7 +877,10 @@ fn resolve_agent_home(value: &Value, home: Option<&str>) -> Result<Option<PathBu
     Ok(Some(canonical))
 }
 
-fn normalize_agent_homes(config: &mut Value, env: &BTreeMap<String, String>) -> Result<()> {
+pub(crate) fn normalize_agent_homes(
+    config: &mut Value,
+    env: &BTreeMap<String, String>,
+) -> Result<()> {
     let home = env.get("HOME").map(String::as_str);
     let global = resolve_agent_home(&config["acp"]["agentHome"], home)?;
     config["acp"]["agentHome"] = global
