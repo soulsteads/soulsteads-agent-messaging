@@ -119,11 +119,13 @@ The labels describe declarations and overrides, so normalization can still
 repair a configured value. Environment settings consumed separately by a
 connector or the access policy are outside this inventory.
 
-`validate` checks strict JSON, normalization, connector access policy, receipt
-and review queue directory existence, ownership, and permissions (without
-locking or reading the journals), ACP agent homes, agent messaging configuration,
-the session store path requirement, enabled Web port range, and build support for enabled
-Matrix and WhatsApp connectors. Successful JSON output is `{"valid":true}`.
+`validate` checks strict JSON, normalization, connector access policy, ACP agent
+homes, agent messaging configuration, the session store path requirement, enabled
+Web port range, and build support for enabled Matrix and WhatsApp connectors.
+It also checks existence, ownership, and permissions for configured Mattermost
+turn receipts, enabled Telegram Skillstore review receipts, and agent review
+queue directories, without locking or reading the journals. Successful JSON
+output is `{"valid":true}`.
 Failures exit nonzero with a sanitized category and guidance on stderr and empty
 stdout. Validation performs local checks only. Connector connectivity,
 credentials, and service status are outside the scope of validation.

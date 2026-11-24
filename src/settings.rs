@@ -209,6 +209,11 @@ impl Settings {
         config::validate_connector_access(&self.normalized, &self.environment).map_err(|_| error(
             "connector_access", "For each enabled remote connector, configure allowedUsers or explicitly set allowAllUsers to true.",
         ))?;
+        crate::connectors::telegram::skill_reviews::validate_receipt_directory(&self.normalized)
+            .map_err(|_| error(
+                "skillstore_receipt_directory",
+                "On Unix, use an existing absolute directory (not a symlink) for telegram.skillReviews.receiptDir, owned by the bridge user with no group or other permissions.",
+            ))?;
         config::enabled_web_port(&self.normalized)
             .map_err(|_| error("web_port", "Set web.port to an integer from 0 to 65535."))?;
         config::validate_platform_sdk_support(&self.normalized).map_err(|_| {
