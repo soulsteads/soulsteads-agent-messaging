@@ -88,6 +88,90 @@ The first build downloads dependencies and can take a while.
 
   For all command-line options, run `./target/release/soulsteads-messaging --help`.
 
+### Run multiple agents in one gateway
+
+On Unix, use a gateway manifest when different bots, accounts, or web listeners should
+reach different agents. Each connector belongs to the agent entry that enables
+it. One agent can enable several connector types; two agents can enable the same
+type with different bot accounts or, for Web, different ports. The gateway does
+not choose an agent from message text. A regular configuration without `agents`
+still runs one agent and keeps its existing state paths.
+
+For example, create `gateway.json` with a Telegram bot for one agent and a Matrix
+account for another (replace the example IDs and paths):
+
+```json
+{
+  "stateDir": "/srv/messaging/state",
+  "agents": [
+    {
+      "id": "build",
+      "config": {
+        "acp": { "defaultBackend": "codex", "agentHome": "/srv/agents/build" },
+        "telegram": {
+          "enabled": true,
+          "token": "{env:BUILD_TELEGRAM_TOKEN}",
+          "allowedUsers": ["123456789"]
+        }
+      }
+    },
+    {
+      "id": "research",
+      "config": {
+        "acp": { "defaultBackend": "opencode", "agentHome": "/srv/agents/research" },
+        "matrix": {
+          "enabled": true,
+          "homeserver": "https://matrix.example.org",
+          "accessToken": "{env:RESEARCH_MATRIX_TOKEN}",
+          "allowedUsers": ["@operator:example.org"],
+          "allowedRooms": ["!research:example.org"],
+          "strictAllowedRooms": true
+        }
+      }
+    }
+  ]
+}
+```
+
+As the service user, create the state directories with mode `0700` (the parent
+must already exist) and ensure the configured ACP homes exist. Use the canonical
+absolute state path, without symlinks. Put the named credentials in a private
+`.env` in the service's working directory or in its environment. Then run:
+
+```sh
+mkdir -m 700 /srv/messaging/state
+mkdir -m 700 /srv/messaging/state/build /srv/messaging/state/research
+soulsteads-messaging --check-config --config gateway.json
+soulsteads-messaging --serve --config gateway.json
+```
+
+`--check-config` checks local configuration without starting connectors. The
+same manifest can be passed to the [systemd service installer](MANUAL-SERVICE.md).
+Use `--check-config`, not `--settings`, for a gateway manifest. CLI prompts and
+the interactive console still require a single-agent configuration.
+
+- **Bindings:** This mode supports Telegram, Matrix, Mattermost, and Web. It
+  requires explicit Matrix access tokens. Use distinct bot accounts and avoid
+  overlapping room/trigger rules that would let two agents answer the same
+  message. Web defaults to loopback in this mode and each enabled Web listener
+  needs a distinct, nonzero port. Configure allowlists inside each agent entry;
+  legacy connector environment overrides are not applied. `{env:NAME}` still
+  works in each agent's settings. Pass provider variables through the agent's
+  `acp.env` or `acp.backends.<backend>.env` rather than relying on full process
+  environment inheritance.
+- **State:** Each ID has its own `sessions.json`, generated `sessions/`
+  workspaces, and Matrix SDK store under `stateDir/<id>/`. Keep IDs stable, do
+  not reuse an ID for a different agent/account, and do not run another gateway
+  against the same state or bot while this one is active. No legacy history is
+  imported automatically. This keeps gateway conversation state separate; it
+  does not sandbox native agents or isolate their Unix user, login state, or
+  filesystem permissions.
+- **Limits:** The native session picker, chat-triggered service restart,
+  Mattermost turn receipts, Telegram Skillstore review bindings, and local
+  `agentMessaging` are not available in this mode. Keep using a single-agent
+  configuration if you need one of those features, or Slack, Discord, or
+  WhatsApp. Stop/restart the shared process to apply configuration changes.
+
 ### Inspect and validate settings locally
 
 ```sh

@@ -99,9 +99,9 @@ Setup for every platform is in the **[setup guide](docs/SETUP.md)**.
 | WhatsApp | [Manual setup](docs/SETUP.md#whatsapp) |
 | Web interface | [Manual setup](docs/SETUP.md#web-interface) |
 
-You can [run multiple connectors in one service](docs/MANUAL-SERVICE.md#multiple-connectors-one-agent)
-using one configured agent. Each connector has its own credentials and
-conversation history; named agent profiles are not yet supported.
+One service can [run several connectors for one agent](docs/MANUAL-SERVICE.md#multiple-connectors-one-agent)
+or [bind different chat accounts to different agents](docs/SETUP.md#run-multiple-agents-in-one-gateway).
+In both cases, each connector keeps its own credentials and conversation bindings.
 
 Credentials go in an environment file; [`.env.example`](.env.example) lists every
 variable the bridge reads.
@@ -186,6 +186,7 @@ private helpers without expanding the production API. They run with `cargo test
 | Guide | Covers |
 |---|---|
 | [Setup guide](docs/SETUP.md) | Every platform, service commands, troubleshooting |
+| [Multi-agent gateway](docs/SETUP.md#run-multiple-agents-in-one-gateway) | Bind different chat accounts to different agents in one process |
 | [Manual user service](docs/MANUAL-SERVICE.md) | Matrix/Mattermost installation, optional Agent Home boundary, upgrades and recovery |
 | [Configuration defaults](src/defaults.json) | Every available option |
 | [Hindsight memory](docs/HINDSIGHT.md) | Give Claude Code, Codex, OpenCode or Pi long-term memory |

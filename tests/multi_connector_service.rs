@@ -281,11 +281,14 @@ impl Drop for Service {
     }
 }
 
-async fn wait_for_sessions(store: &std::path::Path) {
+async fn wait_for_sessions(
+    matrix_store: &std::path::Path,
+    mattermost_store: &std::path::Path,
+    mattermost_backend: &str,
+) {
     timeout(Duration::from_secs(10), async {
         loop {
-            let persisted = Store::new(store);
-            if persisted
+            if Store::new(matrix_store)
                 .get(
                     "matrix",
                     &format!("{MATRIX_ROOM}:{MATRIX_EVENT}"),
@@ -293,11 +296,11 @@ async fn wait_for_sessions(store: &std::path::Path) {
                 )
                 .unwrap()
                 .is_some()
-                && persisted
+                && Store::new(mattermost_store)
                     .get(
                         "mattermost",
                         &format!("{MATTERMOST_CHANNEL}:{MATTERMOST_ROOT}"),
-                        "opencode",
+                        mattermost_backend,
                     )
                     .unwrap()
                     .is_some()
@@ -313,6 +316,15 @@ async fn wait_for_sessions(store: &std::path::Path) {
 
 #[tokio::test]
 async fn serve_runs_matrix_and_mattermost_inbound_outbound_with_separate_persisted_threads() {
+    run_pair(false).await;
+}
+
+#[tokio::test]
+async fn serve_routes_two_chat_bindings_to_distinct_agent_homes_and_stores() {
+    run_pair(true).await;
+}
+
+async fn run_pair(multi_agent: bool) {
     let root = tempfile::tempdir().unwrap();
     let fixture = Fixture::default();
 
@@ -345,38 +357,83 @@ async fn serve_runs_matrix_and_mattermost_inbound_outbound_with_separate_persist
         .into_future(),
     );
 
-    let store = root.path().join("sessions.json");
+    let legacy_store = root.path().join("sessions.json");
     let config = root.path().join("bridge.json");
-    std::fs::write(
-        &config,
-        json!({
-            "rateLimitSeconds":0,
-            "sessionStorePath":store,
-            "toolMessages":{"mode":"off"},
-            "acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":["--echo-prompt"]},
-            "matrix":{
-                "enabled":true,
-                "homeserver":matrix_base,
-                "userId":"@bot:local",
-                "deviceId":"LOCAL",
-                "accessToken":"fixture-matrix-token",
-                "encryption":{"enabled":false},
-                "allowedRooms":[MATRIX_ROOM],
-                "allowedUsers":["@human:local"],
-                "threadIsolation":true
-            },
-            "mattermost":{
-                "enabled":true,
-                "url":mattermost_base,
-                "token":"fixture-mattermost-token",
-                "allowedChannels":[MATTERMOST_CHANNEL],
-                "allowedUsers":["MM_HUMAN"],
-                "threadIsolation":true
+    let legacy = json!({
+        "rateLimitSeconds":0,
+        "sessionStorePath":legacy_store,
+        "toolMessages":{"mode":"off"},
+        "acp":{"command":env!("CARGO_BIN_EXE_acp-fixture"),"args":["--echo-prompt"]},
+        "matrix":{
+            "enabled":true,
+            "homeserver":matrix_base,
+            "userId":"@bot:local",
+            "deviceId":"LOCAL",
+            "accessToken":"fixture-matrix-token",
+            "encryption":{"enabled":false},
+            "allowedRooms":[MATRIX_ROOM],
+            "allowedUsers":["@human:local"],
+            "threadIsolation":true
+        },
+        "mattermost":{
+            "enabled":true,
+            "url":mattermost_base,
+            "token":"fixture-mattermost-token",
+            "allowedChannels":[MATTERMOST_CHANNEL],
+            "allowedUsers":["MM_HUMAN"],
+            "threadIsolation":true
+        }
+    });
+    let mut homes = Vec::new();
+    let (supplied, matrix_store, mattermost_store) = if multi_agent {
+        use std::os::unix::fs::DirBuilderExt;
+        let make_private = |path: &std::path::Path| {
+            std::fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+        };
+        let state = root.path().join("state");
+        make_private(&state);
+        let mut agents = Vec::new();
+        for platform in ["matrix", "mattermost"] {
+            make_private(&state.join(platform));
+            let home = root.path().join(format!("home-{platform}"));
+            make_private(&home);
+            let mut agent = legacy.clone();
+            let fields = agent.as_object_mut().unwrap();
+            fields.remove("sessionStorePath");
+            fields.remove(if platform == "matrix" {
+                "mattermost"
+            } else {
+                "matrix"
+            });
+            agent["acp"]["agentHome"] = json!(home);
+            if platform == "mattermost" {
+                agent["acp"]["defaultBackend"] = json!("pi");
+                agent["acp"]["backends"]["pi"] = json!({
+                    "command":env!("CARGO_BIN_EXE_acp-fixture"),"args":["--echo-prompt"]
+                });
             }
-        })
-        .to_string(),
-    )
-    .unwrap();
+            homes.push(home);
+            agents.push(json!({"id":platform,"config":agent}));
+        }
+        (
+            json!({"stateDir":state,"agents":agents}),
+            state.join("matrix/sessions.json"),
+            state.join("mattermost/sessions.json"),
+        )
+    } else {
+        (legacy, legacy_store.clone(), legacy_store.clone())
+    };
+    std::fs::write(&config, supplied.to_string()).unwrap();
+    if multi_agent {
+        let check = Command::new(env!("CARGO_BIN_EXE_soulsteads-messaging"))
+            .args(["--check-config", "--config", config.to_str().unwrap()])
+            .current_dir(root.path())
+            .env_clear()
+            .output()
+            .unwrap();
+        assert!(check.status.success());
+        assert!(!matrix_store.exists() && !mattermost_store.exists());
+    }
 
     let mut service = Service(
         Command::new(env!("CARGO_BIN_EXE_soulsteads-messaging"))
@@ -395,10 +452,10 @@ async fn serve_runs_matrix_and_mattermost_inbound_outbound_with_separate_persist
     fixture.wait_for_pair_readiness().await;
     fixture.release_both_inbound_events();
     fixture.wait_for_outbound().await;
-    wait_for_sessions(&store).await;
+    let mattermost_backend = if multi_agent { "pi" } else { "opencode" };
+    wait_for_sessions(&matrix_store, &mattermost_store, mattermost_backend).await;
 
-    let persisted = Store::new(&store);
-    let matrix = persisted
+    let matrix = Store::new(&matrix_store)
         .get(
             "matrix",
             &format!("{MATRIX_ROOM}:{MATRIX_EVENT}"),
@@ -406,11 +463,11 @@ async fn serve_runs_matrix_and_mattermost_inbound_outbound_with_separate_persist
         )
         .unwrap()
         .expect("Matrix conversation missing from persisted store");
-    let mattermost = persisted
+    let mattermost = Store::new(&mattermost_store)
         .get(
             "mattermost",
             &format!("{MATTERMOST_CHANNEL}:{MATTERMOST_ROOT}"),
-            "opencode",
+            mattermost_backend,
         )
         .unwrap()
         .expect("Mattermost conversation missing from persisted store");
@@ -418,6 +475,31 @@ async fn serve_runs_matrix_and_mattermost_inbound_outbound_with_separate_persist
         matrix.session_id, mattermost.session_id,
         "Matrix and Mattermost must bind different ACP sessions"
     );
+    if multi_agent {
+        assert_eq!(std::path::Path::new(&matrix.cwd), homes[0]);
+        assert_eq!(std::path::Path::new(&mattermost.cwd), homes[1]);
+        assert!(
+            Store::new(&matrix_store)
+                .get(
+                    "mattermost",
+                    &format!("{MATTERMOST_CHANNEL}:{MATTERMOST_ROOT}"),
+                    mattermost_backend
+                )
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Store::new(&mattermost_store)
+                .get(
+                    "matrix",
+                    &format!("{MATRIX_ROOM}:{MATRIX_EVENT}"),
+                    "opencode"
+                )
+                .unwrap()
+                .is_none()
+        );
+        assert!(!legacy_store.exists());
+    }
     let matrix_reply = format!("{MATRIX_PROMPT} via {}", matrix.session_id);
     let mattermost_reply = format!("{MATTERMOST_PROMPT} via {}", mattermost.session_id);
     assert!(

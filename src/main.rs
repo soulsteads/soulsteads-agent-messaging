@@ -194,6 +194,15 @@ async fn start() -> Result<()> {
         config::project_environment(&cwd, std::env::vars().collect::<BTreeMap<_, _>>())?;
     let mut configuration =
         config::Loader::default().load(&cwd, arguments.config.as_deref(), &environment)?;
+    if configuration.get("agents").is_some() {
+        if !arguments.serve && !arguments.check_config
+            || !arguments.prompt.is_empty()
+            || arguments.no_images
+        {
+            bail!("Gateway manifests require --serve or --check-config without CLI prompt options");
+        }
+        return start_gateway(configuration, &environment, arguments.check_config).await;
+    }
     config::apply_runtime_overrides(&mut configuration, &environment)?;
     // Validate even for --check-config, before connecting any chat service.
     config::validate_connector_access(&configuration, &environment).map_err(|error| {
@@ -247,10 +256,73 @@ async fn start() -> Result<()> {
         }
         return bridge.shutdown().await;
     }
-    let web_port = config::enabled_web_port(&configuration)?;
-    config::validate_platform_sdk_support(&configuration)?;
-    let (shutdown, receiver) = tokio::sync::watch::channel(false);
-    let mut tasks = tokio::task::JoinSet::new();
+    serve_agents(
+        &[ServiceAgent {
+            bridge,
+            #[cfg(feature = "platform-sdks")]
+            matrix_storage: environment
+                .get("MATRIX_STORAGE_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.join(".local/share/opencode-matrix-bot")),
+        }],
+        false,
+    )
+    .await
+}
+
+struct ServiceAgent {
+    bridge: Arc<Bridge>,
+    #[cfg(feature = "platform-sdks")]
+    matrix_storage: PathBuf,
+}
+
+async fn start_gateway(
+    configuration: serde_json::Value,
+    environment: &BTreeMap<String, String>,
+    check_only: bool,
+) -> Result<()> {
+    use soulsteads_messaging::gateway::{Gateway, agent_environment};
+    let gateway = Gateway::load(configuration, environment).map_err(|error| {
+        eprintln!("Gateway configuration: {error}");
+        error
+    })?;
+    let env = agent_environment(environment);
+    let mut agents = Vec::new();
+    for agent in gateway.agents {
+        let bridge =
+            Bridge::new_for_gateway(agent.config, env.clone(), agent.state.join("sessions"))
+                .with_context(|| format!("Invalid bridge configuration for agent {}", agent.id))?;
+        let bridge = Arc::new(bridge);
+        agents.push(ServiceAgent {
+            bridge,
+            #[cfg(feature = "platform-sdks")]
+            matrix_storage: agent.state.join("matrix"),
+        });
+    }
+    if check_only {
+        println!("Configuration loaded successfully; no connectors started.");
+        return Ok(());
+    }
+    // A second gateway must not poll bots or write stores under the same root.
+    let lock = std::fs::File::open(&gateway.state)?;
+    lock.try_lock().context("Gateway state is already in use")?;
+    serve_agents(&agents, true).await
+}
+
+type ServiceTask = futures_util::future::BoxFuture<'static, Result<()>>;
+
+async fn prepare_agent_tasks(
+    agent: &ServiceAgent,
+    multi_agent: bool,
+    receiver: tokio::sync::watch::Receiver<bool>,
+    identities: &mut std::collections::BTreeSet<(String, String, String)>,
+) -> Result<Vec<ServiceTask>> {
+    let bridge = &agent.bridge;
+    let configuration = &bridge.config;
+    let environment = &bridge.env;
+    let web_port = config::enabled_web_port(configuration)?;
+    config::validate_platform_sdk_support(configuration)?;
+    let mut tasks: Vec<ServiceTask> = Vec::new();
     for platform in ["telegram", "mattermost", "slack", "discord"] {
         if !boolean(&configuration[platform], "enabled") {
             continue;
@@ -284,10 +356,21 @@ async fn start() -> Result<()> {
         if token.is_empty() {
             bail!("Enabled connector lacks credentials");
         }
-        let platform = Platform::new(platform, &base, &token, "", "");
+        let connector = Platform::new(platform, &base, &token, "", "");
         let bridge = bridge.clone();
         let receiver = receiver.clone();
-        tasks.spawn(async move { platform.run(bridge, receiver).await });
+        if multi_agent {
+            let connector = connector.identify().await?;
+            let scope = url::Url::parse(&base)?.origin().ascii_serialization();
+            if connector.bot.is_empty()
+                || !identities.insert((platform.into(), scope, connector.bot.clone()))
+            {
+                bail!("Gateway connector account is missing or assigned more than once");
+            }
+            tasks.push(Box::pin(connector.run_identified(bridge, receiver)));
+        } else {
+            tasks.push(Box::pin(connector.run(bridge, receiver)));
+        }
     }
     if let Some(port) = web_port {
         let address = format!("{}:{port}", string(&configuration["web"], "host"));
@@ -295,14 +378,14 @@ async fn start() -> Result<()> {
         let router =
             soulsteads_messaging::web::router(bridge.clone(), configuration["web"].clone());
         let mut receiver = receiver.clone();
-        tasks.spawn(async move {
+        tasks.push(Box::pin(async move {
             axum::serve(listener, router)
                 .with_graceful_shutdown(async move {
                     let _ = receiver.changed().await;
                 })
                 .await
                 .map_err(Into::into)
-        });
+        }));
     }
     #[cfg(feature = "platform-sdks")]
     for platform in ["matrix", "whatsapp"] {
@@ -312,25 +395,29 @@ async fn start() -> Result<()> {
         let bridge = bridge.clone();
         let receiver = receiver.clone();
         if platform == "matrix" {
-            let storage = environment
-                .get("MATRIX_STORAGE_PATH")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| home.join(".local/share/opencode-matrix-bot"));
             let client = soulsteads_messaging::connectors::matrix::connect(
                 &configuration[platform],
-                &storage,
+                &agent.matrix_storage,
             )
             .await?;
-            tasks.spawn(async move {
+            if multi_agent {
+                let user = client
+                    .user_id()
+                    .context("Gateway Matrix account is missing")?;
+                if !identities.insert((platform.into(), String::new(), user.to_string())) {
+                    bail!("Gateway Matrix account assigned more than once");
+                }
+            }
+            tasks.push(Box::pin(async move {
                 soulsteads_messaging::connectors::matrix::run(client, bridge, receiver).await
-            });
+            }));
         } else {
             let bot =
                 soulsteads_messaging::connectors::whatsapp::build(&configuration[platform], bridge)
                     .await?;
-            tasks.spawn(async move {
+            tasks.push(Box::pin(async move {
                 soulsteads_messaging::connectors::whatsapp::run(bot, receiver).await
-            });
+            }));
         }
     }
     if tasks.is_empty() {
@@ -338,7 +425,7 @@ async fn start() -> Result<()> {
     }
     let mirror_bridge = bridge.clone();
     let mut mirror_shutdown = receiver.clone();
-    tasks.spawn(async move {
+    tasks.push(Box::pin(async move {
         let mut poll = tokio::time::interval(Duration::from_secs(1));
         loop {
             tokio::select! {
@@ -347,12 +434,12 @@ async fn start() -> Result<()> {
             }
         }
         Ok(())
-    });
+    }));
     #[cfg(feature = "agent-network")]
     if configuration["agentMessaging"]["tools"]["reviewQueueDir"].is_string() {
         let review_bridge = bridge.clone();
         let mut review_shutdown = receiver.clone();
-        tasks.spawn(async move {
+        tasks.push(Box::pin(async move {
             let mut poll = tokio::time::interval(Duration::from_secs(1));
             poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
@@ -367,14 +454,39 @@ async fn start() -> Result<()> {
                 }
             }
             Ok(())
-        });
+        }));
+    }
+    Ok(tasks)
+}
+
+async fn serve_agents(agents: &[ServiceAgent], multi_agent: bool) -> Result<()> {
+    let (shutdown, receiver) = tokio::sync::watch::channel(false);
+    let mut stop = std::pin::pin!(shutdown_signal());
+    let prepare = async {
+        let mut pending = Vec::new();
+        let mut identities = std::collections::BTreeSet::new();
+        for agent in agents {
+            pending.extend(
+                prepare_agent_tasks(agent, multi_agent, receiver.clone(), &mut identities).await?,
+            );
+        }
+        Ok::<_, anyhow::Error>(pending)
+    };
+    // Register signal handlers before transport startup, and do not dispatch
+    // any prompts until all bindings have been prepared successfully.
+    let pending = tokio::select! {
+        biased;
+        result = &mut stop => return result.map_err(Into::into),
+        result = prepare => result?,
+    };
+    let mut tasks = tokio::task::JoinSet::new();
+    for task in pending {
+        tasks.spawn(task);
     }
     let result = supervise(
-        &bridge,
-        &environment,
-        &configuration,
+        agents.iter().map(|agent| agent.bridge.as_ref()),
         &mut tasks,
-        shutdown_signal(),
+        stop,
         Instant::now,
     )
     .await;
@@ -384,10 +496,12 @@ async fn start() -> Result<()> {
     })
     .await;
     if drained.is_err() {
-        tasks.abort_all();
+        tasks.shutdown().await;
     }
-    bridge.shutdown().await?;
-    result
+    // Attempt every bridge cleanup even when one backend reports an error.
+    let cleanup =
+        futures_util::future::join_all(agents.iter().map(|agent| agent.bridge.shutdown())).await;
+    result.and(cleanup.into_iter().collect::<Result<()>>())
 }
 
 fn run_command(command: Command, config: Option<PathBuf>) -> Result<()> {
@@ -421,37 +535,40 @@ fn run_command(command: Command, config: Option<PathBuf>) -> Result<()> {
     }
 }
 
-async fn supervise(
-    bridge: &Bridge,
-    environment: &BTreeMap<String, String>,
-    configuration: &serde_json::Value,
+async fn supervise<'a>(
+    bridges: impl IntoIterator<Item = &'a Bridge>,
     tasks: &mut tokio::task::JoinSet<Result<()>>,
     stop: impl std::future::Future<Output = std::io::Result<()>>,
     sweep_time: impl Fn() -> Instant,
 ) -> Result<()> {
-    let retention = SessionRetentionPolicy::from_environment(environment);
-    let mut sweep = [
-        "matrix",
-        "discord",
-        "mattermost",
-        "telegram",
-        "slack",
-        "whatsapp",
-        "web",
-    ]
-    .iter()
-    .any(|platform| boolean(&configuration[platform], "enabled") && retention.is_enabled(platform))
-    .then(|| tokio::time::interval(Duration::from_secs(60)));
+    let retention: Vec<_> = bridges
+        .into_iter()
+        .filter_map(|bridge| {
+            let policy = SessionRetentionPolicy::from_environment(&bridge.env);
+            soulsteads_messaging::gateway::PLATFORMS
+                .iter()
+                .any(|platform| {
+                    boolean(&bridge.config[*platform], "enabled") && policy.is_enabled(platform)
+                })
+                .then_some((bridge, policy))
+        })
+        .collect();
+    let mut sweep = (!retention.is_empty()).then(|| tokio::time::interval(Duration::from_secs(60)));
     tokio::pin!(stop);
     loop {
         tokio::select! {
-            _=&mut stop=>break Ok(()),
+            result=&mut stop=>break result.map_err(Into::into),
             _=async {
                 match &mut sweep {
                     Some(sweep) => { sweep.tick().await; },
                     None => std::future::pending::<()>().await,
                 }
-            }=>{bridge.expire_with_policy(&retention, sweep_time()).await?;},
+            }=>{
+                let now = sweep_time();
+                for (bridge, policy) in &retention {
+                    bridge.expire_with_policy(policy, now).await?;
+                }
+            },
             result=tasks.join_next()=>break match result{Some(Ok(result))=>result,Some(Err(error))=>Err(error.into()),None=>Ok(())},
         }
     }
@@ -543,17 +660,10 @@ mod retention_startup_tests {
                 120
             };
             let ticks = std::cell::Cell::new(0);
-            supervise(
-                &bridge,
-                &environment,
-                &configuration,
-                &mut tasks,
-                stop,
-                || {
-                    ticks.set(ticks.get() + 1);
-                    Instant::now() + Duration::from_secs(age)
-                },
-            )
+            supervise([&bridge], &mut tasks, stop, || {
+                ticks.set(ticks.get() + 1);
+                Instant::now() + Duration::from_secs(age)
+            })
             .await
             .unwrap();
             let after = store.get("web", "startup", "opencode").unwrap();

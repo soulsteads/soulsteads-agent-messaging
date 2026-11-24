@@ -64,19 +64,16 @@ platform-scoped. This is not a cross-platform shared transcript, and a service
 restart affects all its connectors. A connector that fails fatally can bring
 this whole process down; keep separate units if that failure isolation matters.
 
-### Future: multiple agent profiles
+### Multiple agents in one service
 
-A future service can host named profiles by giving each profile its own Bridge,
-agent home, backend settings, and state paths. Connectors should bind to one
-profile explicitly at first. Keep account ownership with the service so a
-shared bot, if later supported, has one connection and routes by an explicit
-account-and-conversation rule. Unmatched or ambiguous routes must not fall
-through to another profile. Sessions, approvals, queued work, and delivery
-receipts must stay with their owning profile; do not automatically import
-legacy state into a newly named profile. In-process profiles would organize
-configuration and state, not sandbox mutually untrusted agents.
-
-Multiple named profiles and profile routing are not available today.
+To bind different chat accounts to different agents in one process, use a
+[gateway manifest](SETUP.md#run-multiple-agents-in-one-gateway) instead of the
+single-agent example above. Each named agent has its own backend settings,
+optional agent home, and state directory. Pass the manifest as `--config` to
+the same unit installer in step 5. Validate it with `--check-config` before
+starting the service. The manifest does not import legacy sessions or route
+one shared bot to multiple agents. A service restart still affects every
+binding, and the agents run as the same Unix user, not in separate sandboxes.
 
 ## 1. Check prerequisites and ownership
 
