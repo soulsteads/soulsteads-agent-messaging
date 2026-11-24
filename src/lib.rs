@@ -16,6 +16,8 @@ mod private_journal;
 mod profile;
 pub mod runtime;
 pub mod settings;
+#[cfg(unix)]
+pub mod settings_web;
 pub mod store;
 pub mod tools;
 pub mod web;

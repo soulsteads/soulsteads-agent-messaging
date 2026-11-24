@@ -68,7 +68,7 @@ impl Loader {
     }
 }
 
-const SETTINGS_FILE_LIMIT: u64 = 1024 * 1024;
+pub(crate) const SETTINGS_FILE_LIMIT: u64 = 1024 * 1024;
 
 pub(crate) fn read_settings_file(path: &Path) -> io::Result<Vec<u8>> {
     let check_file = |metadata: fs::Metadata| {
@@ -170,11 +170,20 @@ pub fn enabled_web_port(config: &Value) -> Result<Option<u16>> {
     if !boolean(&config["web"], "enabled") {
         return Ok(None);
     }
-    config["web"]["port"]
+    web_port(&config["web"]["port"]).map(Some)
+}
+
+fn web_port(value: &Value) -> Result<u16> {
+    value
         .as_u64()
         .and_then(|port| u16::try_from(port).ok())
-        .map(Some)
         .context("Invalid web port")
+}
+
+#[cfg(unix)]
+pub(crate) fn validate_file_web_port(value: &Value) -> Result<()> {
+    // Interpolation yields strings; the file-backed port must be a JSON integer.
+    web_port(value).map(|_| ())
 }
 
 /// Checks whether this build supports the enabled SDK connectors.
@@ -454,11 +463,16 @@ pub(crate) fn normalize(mut supplied: Value, env: &BTreeMap<String, String>) -> 
     Ok(value)
 }
 
+fn environment_template() -> &'static regex::Regex {
+    static PATTERN: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"\{env:([^}]+)\}").unwrap());
+    &PATTERN
+}
+
 fn substitute(value: &mut Value, env: &BTreeMap<String, String>) {
     match value {
         Value::String(text) => {
-            let pattern = regex::Regex::new(r"\{env:([^}]+)\}").unwrap();
-            *text = pattern
+            *text = environment_template()
                 .replace_all(text, |captures: &regex::Captures<'_>| {
                     env.get(&captures[1]).cloned().unwrap_or_default()
                 })

@@ -1,4 +1,4 @@
-//! Read-only settings inspection shared by operator interfaces.
+//! Settings inspection and validation shared by operator interfaces.
 
 use crate::{config, delivery::AdmissionConfig, private_journal::Disk, runtime};
 use serde::{
@@ -27,7 +27,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-fn error(category: &'static str, guidance: &'static str) -> Error {
+pub(crate) fn error(category: &'static str, guidance: &'static str) -> Error {
     Error { category, guidance }
 }
 
@@ -83,6 +83,14 @@ impl Settings {
                 ));
             }
         };
+        Self::from_document(cwd, supplied, ambient)
+    }
+
+    pub(crate) fn from_document(
+        cwd: &Path,
+        supplied: Value,
+        ambient: BTreeMap<String, String>,
+    ) -> Result<Self, Error> {
         let defaults = config::defaults();
         for (key, value) in defaults.as_object().expect("object defaults") {
             if value.is_object()
@@ -145,8 +153,17 @@ impl Settings {
     }
 
     pub fn list(&self) -> Vec<Entry> {
+        self.entries(false)
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn console_entries(&self) -> Vec<Entry> {
+        self.entries(true)
+    }
+
+    fn entries(&self, console: bool) -> Vec<Entry> {
         let mut paths = BTreeSet::new();
-        default_paths(&config::defaults(), String::new(), &mut paths);
+        default_paths(&config::defaults(), String::new(), &mut paths, console);
         for (key, path, prefix) in [
             ("toolMessages", "/toolMessages", "/toolMessages/"),
             ("web", "/web", "/web/"),
@@ -163,8 +180,19 @@ impl Settings {
             "/agentMessaging/tools/reviewQueueDir",
             "/mattermost/turnReceiptDir",
         ] {
-            if self.supplied.pointer(path).is_some() {
+            if console || self.supplied.pointer(path).is_some() {
                 paths.insert(path.to_owned());
+            }
+        }
+        if console {
+            paths.extend(["/acp/env", "/agentMessaging/agents", "/streamTools"].map(str::to_owned));
+            if self.supplied["streamTools"].is_array()
+                && self
+                    .supplied
+                    .pointer("/toolMessages/showOutputFor")
+                    .is_none()
+            {
+                paths.remove("/toolMessages/showOutputFor");
             }
         }
         paths
@@ -173,7 +201,8 @@ impl Settings {
                 source: if self.overrides.contains(&path) {
                     Source::EnvOverride
                 } else if self.supplied.pointer(&path).is_some()
-                    || path == "/toolMessages/showOutputFor"
+                    || !console
+                        && path == "/toolMessages/showOutputFor"
                         && self.supplied["streamTools"].is_array()
                 {
                     Source::Configured
@@ -183,6 +212,13 @@ impl Settings {
                 path,
             })
             .collect()
+    }
+
+    /// Return only allowlisted strings, known booleans, and selected integers
+    /// that the browser can represent exactly.
+    #[cfg(unix)]
+    pub(crate) fn console_scalar<'a>(&'a self, defaults: &Value, path: &str) -> Option<&'a Value> {
+        console_scalar(defaults, path, self.normalized.pointer(path)?)
     }
 
     pub fn get(&self, path: &str) -> Result<Entry, Error> {
@@ -252,9 +288,33 @@ impl Settings {
     }
 }
 
-fn default_paths(value: &Value, path: String, paths: &mut BTreeSet<String>) {
+#[cfg(unix)]
+pub(crate) fn console_scalar<'a>(
+    defaults: &Value,
+    path: &str,
+    value: &'a Value,
+) -> Option<&'a Value> {
+    let safe = match path {
+        "/rateLimitSeconds"
+        | "/web/port"
+        | "/toolMessages/maxTraceEntries"
+        | "/sessionPicker/mirrorIntervalSeconds" => value.as_u64().is_some_and(|n| n < (1 << 53)),
+        "/toolMessages/mode" => matches!(
+            value.as_str(),
+            Some("off" | "events" | "status" | "trace" | "hermes")
+        ),
+        "/matrix/terminalThread/mode" => matches!(value.as_str(), Some("off" | "always" | "auto")),
+        "/agentMessaging/enabled" | "/agentMessaging/tools/enabled" => value.is_boolean(),
+        _ => defaults.pointer(path).is_some_and(Value::is_boolean) && value.is_boolean(),
+    };
+    safe.then_some(value)
+}
+
+fn default_paths(value: &Value, path: String, paths: &mut BTreeSet<String>, console: bool) {
     match path.as_str() {
-        "/matrix/accessToken" | "/matrix/password" | "/mattermost/token" | "/telegram/token" => {
+        "/matrix/accessToken" | "/matrix/password" | "/mattermost/token" | "/telegram/token"
+            if !console =>
+        {
             return;
         }
         _ => {}
@@ -262,7 +322,7 @@ fn default_paths(value: &Value, path: String, paths: &mut BTreeSet<String>) {
     if let Some(fields) = value.as_object() {
         for (key, value) in fields {
             let segment = key.replace('~', "~0").replace('/', "~1");
-            default_paths(value, format!("{path}/{segment}"), paths);
+            default_paths(value, format!("{path}/{segment}"), paths, console);
         }
     } else {
         paths.insert(path);
@@ -271,7 +331,18 @@ fn default_paths(value: &Value, path: String, paths: &mut BTreeSet<String>) {
 
 const DUPLICATE: &str = "duplicate settings object member";
 
-fn parse_object(input: &str) -> Result<Value, Error> {
+pub(crate) fn parse_object(input: &str) -> Result<Value, Error> {
+    let value = parse_value(input)?;
+    if !value.is_object() {
+        return Err(error(
+            "expected_object",
+            "Use a JSON object at the configuration root.",
+        ));
+    }
+    Ok(value)
+}
+
+pub(crate) fn parse_value(input: &str) -> Result<Value, Error> {
     let StrictValue(value) = serde_json::from_str(input).map_err(|failure| {
         if failure.to_string().starts_with(DUPLICATE) {
             error(
@@ -285,12 +356,6 @@ fn parse_object(input: &str) -> Result<Value, Error> {
             )
         }
     })?;
-    if !value.is_object() {
-        return Err(error(
-            "expected_object",
-            "Use a JSON object at the configuration root.",
-        ));
-    }
     Ok(value)
 }
 

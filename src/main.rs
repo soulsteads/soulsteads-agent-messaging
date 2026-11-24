@@ -21,7 +21,7 @@ use cli_images::Console;
 #[command(
     version,
     about = "Native ACP chat bridge",
-    after_help = "Read-only settings: soulsteads-messaging --settings <list|validate|get> --help"
+    after_help = "Local settings: soulsteads-messaging --settings <list|validate|get|serve> --help"
 )]
 struct Arguments {
     #[arg(long, value_enum, conflicts_with_all = ["config", "check_config", "serve", "no_images", "prompt"])]
@@ -43,11 +43,12 @@ enum SettingsOperation {
     List,
     Validate,
     Get,
+    Serve,
 }
 
 #[derive(Parser)]
 #[command(
-    about = "Inspect and validate local settings",
+    about = "Inspect, validate, and manage local settings",
     disable_help_subcommand = true
 )]
 struct SettingsArguments {
@@ -75,7 +76,7 @@ fn settings_requested(args: &[OsString]) -> bool {
 }
 
 fn run_settings(args: Vec<OsString>) -> Result<()> {
-    const USAGE: &str = "settings_usage: Use --settings list, validate, or get JSON_POINTER with optional --config FILE and --json.";
+    const USAGE: &str = "settings_usage: Use --settings list, validate, get JSON_POINTER, or serve with optional --config FILE. --json is for inspection only.";
     let arguments = match SettingsArguments::try_parse_from(args) {
         Ok(arguments) => arguments,
         Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => error.exit(),
@@ -92,9 +93,19 @@ fn run_settings(args: Vec<OsString>) -> Result<()> {
     let ambient = std::env::vars_os()
         .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)))
         .collect();
+    if matches!(operation, SettingsOperation::Serve) {
+        if arguments.json {
+            bail!(USAGE);
+        }
+        #[cfg(unix)]
+        return soulsteads_messaging::settings_web::serve(cwd, arguments.config, ambient);
+        #[cfg(not(unix))]
+        bail!("settings_platform: The local settings console requires Unix.");
+    }
     let settings =
         soulsteads_messaging::settings::Settings::load(&cwd, arguments.config.as_deref(), ambient)?;
     match operation {
+        SettingsOperation::Serve => unreachable!(),
         SettingsOperation::List => {
             let entries = settings.list();
             if arguments.json {

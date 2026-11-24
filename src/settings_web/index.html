@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Messaging settings</title>
+  <script src="/console.js" defer></script>
+  <link rel="stylesheet" href="/console.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Messaging settings</h1>
+      <p>Review effective settings and edit the gateway’s configuration file.</p>
+    </header>
+    <p id="status" role="status" aria-live="polite">Open the private URL printed by the settings command.</p>
+    <section id="workspace" hidden aria-label="Configuration">
+      <div class="toolbar">
+        <label>Find a setting
+          <input id="search" type="search" placeholder="Filter by JSON Pointer">
+        </label>
+        <label>Source
+          <select id="source">
+            <option value="">All sources</option>
+            <option value="default">Default</option>
+            <option value="configured">File</option>
+            <option value="env_override">Environment</option>
+          </select>
+        </label>
+        <button id="clear-filters" type="button" disabled>Clear filters</button>
+        <button id="refresh" type="button">Reload and validate</button>
+      </div>
+      <p id="results" role="status"></p>
+      <div id="settings"></div>
+      <section class="editor" aria-labelledby="advanced">
+        <h2 id="advanced">Write-only settings</h2>
+        <p>Enter a JSON Pointer for a credential, optional setting, or dynamic key. Set a typed JSON value or remove only that override.</p>
+        <form id="edit" autocomplete="off">
+          <p id="edit-context" role="status"></p>
+          <label for="path">JSON Pointer</label>
+          <input id="path" required spellcheck="false" placeholder="/acp/backends/custom">
+          <label for="value">JSON value</label>
+          <textarea id="value" aria-describedby="edit-context" rows="3" spellcheck="false" autocapitalize="off" placeholder='false, 5, or "text"'></textarea>
+          <div class="actions">
+            <button type="submit" value="set">Set value</button>
+            <button type="submit" value="reset">Reset override</button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

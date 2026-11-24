@@ -1,0 +1,101 @@
+:root {
+  color-scheme: light dark;
+  font: 1rem/1.5 system-ui, sans-serif;
+  --page: #edf2f5;
+  --panel: #fff;
+  --ink: #182c37;
+  --muted: #485e6b;
+  --line: #bac9d1;
+  --accent: #155c68;
+  --tint: #e0eff0;
+  --file: #e1ecff;
+  --environment: #fff0cd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #101c26;
+    --panel: #182832;
+    --ink: #e9f3f7;
+    --muted: #bbced8;
+    --line: #526b79;
+    --accent: #92dce2;
+    --tint: #25464c;
+    --file: #283e62;
+    --environment: #493a22;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); }
+main { max-width: 64rem; margin: auto; padding: clamp(1rem, 5vw, 3rem); }
+header { border-block-end: 1px solid var(--line); padding-block-end: .75rem; }
+h1 { font-size: clamp(1.85rem, 5vw, 3rem); line-height: 1.12; margin: 0; }
+h2 { font-size: 1.25rem; margin: 0; }
+p { margin: .55rem 0; }
+header p, .editor > p, #results, .setting small { color: var(--muted); }
+#status {
+  margin: 1rem 0;
+  padding: .7rem .85rem;
+  border-inline-start: .25rem solid var(--accent);
+  border-radius: .35rem;
+  background: var(--tint);
+}
+
+.toolbar, .editor, details {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+}
+.toolbar, .editor { padding: clamp(.75rem, 3vw, 1.25rem); }
+.toolbar, .actions { display: flex; gap: .65rem; flex-wrap: wrap; }
+.toolbar { align-items: end; }
+.toolbar label { display: grid; gap: .25rem; font-weight: 600; }
+.toolbar label:first-child { flex: 1 1 15rem; min-width: 0; }
+.toolbar input, .toolbar select { width: 100%; }
+.is-filtering .toolbar { border-color: var(--accent); }
+#results { margin: .7rem 0; min-height: 1.5em; }
+
+input, textarea, select, button {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: .4rem .65rem;
+  border: 1px solid var(--line);
+  border-radius: .4rem;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+}
+textarea { resize: vertical; }
+button { cursor: pointer; font-weight: 600; }
+button:enabled:hover, button:enabled:active { background: var(--tint); border-color: var(--accent); }
+button:disabled { opacity: .58; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+details { margin-block: .55rem; }
+summary {
+  padding: .7rem .95rem;
+  cursor: pointer;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  border-radius: .7rem;
+}
+details[open] > summary { background: var(--tint); border-end-start-radius: 0; border-end-end-radius: 0; }
+.setting { padding: .75rem .95rem; border-block-start: 1px solid var(--line); }
+.setting-heading { display: flex; align-items: baseline; gap: .4rem .65rem; flex-wrap: wrap; }
+.setting code { overflow-wrap: anywhere; min-width: 0; font-size: .95rem; font-weight: 600; }
+.badge { padding: .1rem .55rem; border-radius: 1rem; font-size: .8rem; background: var(--page); }
+.badge[data-source="configured"] { background: var(--file); }
+.badge[data-source="env_override"] { background: var(--environment); }
+.setting .actions { margin-block-start: .55rem; }
+.setting input { width: 9rem; }
+.editor { margin-block-start: 1.25rem; }
+#edit { display: grid; gap: .5rem; max-width: 35rem; margin-block-start: .75rem; }
+#edit-context { margin: 0; padding: .6rem .75rem; border-radius: .4rem; background: var(--environment); }
+#edit-context:empty { display: none; }
+
+@media (max-width: 32rem) {
+  .toolbar label:first-child { flex-basis: 100%; }
+  .toolbar label:nth-child(2) { flex: 1 1 8rem; }
+}

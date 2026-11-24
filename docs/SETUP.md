@@ -307,6 +307,54 @@ and uses long polling instead; another app using that bot will conflict.
 
 Run these commands from this repository's directory.
 
+### Manage settings in the local web console
+
+```sh
+./target/release/soulsteads-messaging --settings serve
+./target/release/soulsteads-messaging --settings serve --config ./custom.json
+```
+
+Run this Unix-only command in the gateway's project directory to use the same
+project dotenv files. Keep the terminal output private and open the URL it
+prints in a local browser. The process picks a free port on IPv4 loopback
+(`127.0.0.1`). Remote access, port forwarding, and reverse proxies are
+unsupported. The browser removes the access token from the URL fragment and
+holds it in page memory. Reopen the printed URL if you reload the whole page.
+Stop the console with Ctrl-C and start it again to rotate the token.
+
+Search the grouped settings by JSON Pointer and filter by Default, File, or
+Environment. Matching groups open automatically. **Clear filters** restores
+the previously expanded groups. The list displays values for selected
+booleans, numbers, and enumerated settings. Credentials, URLs, free-form text,
+and complex values are write-only. An Environment badge marks an active
+override. When its value can be shown, it appears as read-only. Choose
+**Edit file value** to open the write-only editor. After saving, the console
+checks whether the environment still takes precedence. Use **Write-only settings**
+to set typed JSON or remove a file override, including optional keys and
+dynamic ACP settings. Use `~1` for a slash and `~0` for a tilde in a key. Existing
+arrays accept index edits and resets, and `-` appends to an existing array.
+Set the whole array to create an absent array. The root is reserved.
+
+**Reload and validate** checks the current file without writing it. Saving
+validates the proposed document and rejects stale revisions. Applied environment
+overrides take precedence over saved file values. A successful save requires a
+gateway restart to apply. The console starts and stops independently of the
+gateway and performs no restart.
+
+The startup config path is fixed for the process. Its canonical parent must
+already exist on a trusted local filesystem, be owned by the effective UID,
+and deny group and other writes. The config can be absent or a single-link
+regular file owned by that UID with no group or other write permissions.
+Symbolic links and special files are rejected. Config and dotenv input are
+limited to 1 MiB per file, API writes to 1 MiB per request, and edit pointers
+to 127 segments. Save publishes owner-only JSON in the same directory and may
+reformat the document. Cooperating console processes lock the parent directory
+while checking revisions and publishing. Only the trusted operator should be
+able to change or move that directory or its ancestors. Editors and other
+same-UID programs can ignore the lock, so close them during console edits.
+Revision checks catch changes before publication but cannot protect against
+an independent writer changing the path between the final check and rename.
+
 ### 1. Build the bridge
 
 ```sh
