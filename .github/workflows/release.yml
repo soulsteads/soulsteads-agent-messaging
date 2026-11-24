@@ -9,8 +9,7 @@ on:
       - Cargo.lock
       - Cargo.toml
       - scripts/release-notices/**
-      - Cargo.lock
-      - Cargo.toml
+      - tests/test_release_assets.py
 
 permissions:
   contents: read
@@ -25,6 +24,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Test release asset validation offline
+        run: python3 -B -m unittest discover -s tests -p 'test_release_assets.py' -v
       - name: Prepare Rust build environment
         run: |
           sudo apt-get update
@@ -259,7 +260,25 @@ jobs:
           RELEASE_ID: ${{ github.event.release.id }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          sha256sum --strict --check SHA256SUMS
+          archive=soulsteads-agent-messaging-linux-x86_64.tar.gz
+          files=("$archive" SHA256SUMS)
+          shopt -s dotglob nullglob
+          entries=(*)
+          if [[ ${#entries[@]} -ne ${#files[@]} ]]; then
+            echo 'Expected exactly the release archive and SHA256SUMS.' >&2
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            if [[ ! -f "$file" || -L "$file" ]]; then
+              printf 'Expected a regular, non-symlink release asset: %s\n' "$file" >&2
+              exit 1
+            fi
+          done
+          # Compare the complete manifest without opening paths named by it.
+          if ! sha256sum -- "$archive" | cmp -s -- SHA256SUMS -; then
+            echo 'SHA256SUMS must contain exactly the matching checksum for the release archive.' >&2
+            exit 1
+          fi
           [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
           release=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID")
           jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false' <<< "$release" > /dev/null
@@ -278,9 +297,7 @@ jobs:
           # Read from the immutable artifact handoff, and upload to the exact event release ID.
           # Resume interrupted uploads only when already-present bytes are identical.
           existing=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100")
-          files=(*)
           for file in "${files[@]}"; do
-            [[ -f "$file" && ! -L "$file" && "$file" =~ ^[A-Za-z0-9_.+-]+$ ]]
             expected="sha256:$(sha256sum -- "$file" | cut -d ' ' -f 1)"
             prior=$(jq -c --arg name "$file" 'flatten | map(select(.name == $name))' <<< "$existing")
             if [[ "$prior" == '[]' ]]; then
@@ -297,7 +314,7 @@ jobs:
             fi
             asset_name=$(jq -rn --arg name "$file" '$name | @uri')
             asset_query="name=$asset_name"
-            if [[ "$file" == soulsteads-agent-messaging-linux-x86_64.tar.gz ]]; then
+            if [[ "$file" == "$archive" ]]; then
               asset_label=$(jq -rn --arg label 'Licensed default Linux binary (x86_64)' '$label | @uri')
               asset_query+="&label=$asset_label"
             fi
