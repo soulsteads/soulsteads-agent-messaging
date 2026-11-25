@@ -25,7 +25,10 @@ Telegram setup helper does not configure Mattermost.
 ## Create private configuration
 
 Follow steps 1–3 of the [service guide](MANUAL-SERVICE.md), with
-`INSTANCE=mattermost`. In its private `credentials.env`, save:
+`INSTANCE=mattermost`. In the service's working directory (`$ROOT/work`),
+create the private file `$ROOT/work/.env`. The bridge loads `.env` relative to
+its working directory, not relative to `bridge.json`; the generated unit does
+not load a separate `credentials.env`. Add:
 
 ```dotenv
 MATTERMOST_URL=https://mattermost.example.org
@@ -82,8 +85,16 @@ that includes Matrix or WhatsApp, use the SDK-enabled build. Do not reuse the
 Telegram helper's service name or assume its commands manage this manually
 installed service.
 
-`--check-config` only loads configuration. It does not test the token, channel
-membership, WebSocket connection, allowlists, or harness login.
+Run `--check-config` from `$ROOT/work`, the directory used by the generated
+service. It is an offline check: it can exit successfully even if `.env` is
+missing and the credential references cannot be resolved. Check that the URL
+and token are configured without printing them, and verify the harness command
+is executable by the service account. Use an absolute executable path when
+it is not on the service's `PATH`.
+
+After an authorized test start, check a reply in the source thread. Config
+validation does not prove authentication, channel membership, WebSocket
+delivery, harness login, or actual sender and channel admission.
 
 ## Optional durable turn receipts
 
