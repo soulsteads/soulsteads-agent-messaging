@@ -248,9 +248,16 @@ never enables, starts, or reloads a unit.
 ```
 
 The generated unit has an explicit `WorkingDirectory`, starts the gateway with
-`--serve --config`, and contains no credentials or `EnvironmentFile`. Validate
-the configuration as the service user before activation, then check and reload the
-unit manually:
+`--serve --config`, and contains no credentials or `EnvironmentFile`.
+`$ROOT/work` is the walkthrough's choice, not a bridge requirement. For a
+custom layout, `$ROOT/.env` works only if `$ROOT` is the service's
+`WorkingDirectory`. Run the installer preview from the intended directory and
+check `WorkingDirectory` in its output. Use that same directory for the config
+check, keep `.env` at mode `0600`, and review any relative paths in your config
+before changing an existing service's working directory.
+
+Validate the configuration as the service user before activation, then check
+and reload the unit manually:
 
 ```sh
 (
