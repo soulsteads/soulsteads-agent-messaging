@@ -114,6 +114,16 @@ impl Gateway {
                     port != 0 && !config::string(&config["web"], "host").is_empty(),
                     "Web requires a host and a nonzero port"
                 );
+                // Check the effective values after interpolation. The legacy
+                // wildcard default is deliberately not valid in a gateway.
+                ensure!(
+                    config["web"]["allowedOrigins"]
+                        .as_array()
+                        .is_some_and(
+                            |origins| !origins.is_empty() && origins.iter().all(exact_web_origin)
+                        ),
+                    "Enabled gateway Web bindings require web.allowedOrigins to list exact HTTP(S) origins (no wildcard or path)"
+                );
                 ensure!(web_ports.insert(port), "Duplicate Web port");
             }
             result.push(Agent { id, config, state });
@@ -123,6 +133,16 @@ impl Gateway {
             agents: result,
         })
     }
+}
+
+fn exact_web_origin(value: &Value) -> bool {
+    value.as_str().is_some_and(|origin| {
+        !origin.contains('*')
+            && url::Url::parse(origin).is_ok_and(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.origin().ascii_serialization() == origin
+            })
+    })
 }
 
 fn prepare_agent(

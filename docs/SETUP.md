@@ -153,12 +153,15 @@ the interactive console still require a single-agent configuration.
 - **Bindings:** This mode supports Telegram, Matrix, Mattermost, and Web. It
   requires explicit Matrix access tokens. Use distinct bot accounts and avoid
   overlapping room/trigger rules that would let two agents answer the same
-  message. Web defaults to loopback in this mode and each enabled Web listener
-  needs a distinct, nonzero port. Configure allowlists inside each agent entry;
-  legacy connector environment overrides are not applied. `{env:NAME}` still
-  works in each agent's settings. Pass provider variables through the agent's
-  `acp.env` or `acp.backends.<backend>.env` rather than relying on full process
-  environment inheritance.
+  message. Web defaults to loopback in this mode. Each enabled Web listener
+  needs a distinct, nonzero port and an explicit `web.allowedOrigins` list,
+  for example `["http://127.0.0.1:3420"]`. List the exact HTTP(S) origins
+  browsers use, without wildcards, paths, or trailing slashes. This is a
+  browser origin check, not authentication. Configure allowlists inside each
+  agent entry; legacy connector environment overrides are not applied.
+  `{env:NAME}` still works in each agent's settings. Pass provider variables
+  through the agent's `acp.env` or `acp.backends.<backend>.env` rather than
+  relying on full process environment inheritance.
 - **State:** Each ID has its own `sessions.json`, generated `sessions/`
   workspaces, and Matrix SDK store under `stateDir/<id>/`. Keep IDs stable, do
   not reuse an ID for a different agent/account, and do not run another gateway
