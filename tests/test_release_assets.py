@@ -37,7 +37,8 @@ class ReleaseTriggerTests(unittest.TestCase):
         self.assertCountEqual(patterns, (
             ".github/workflows/release.yml", ".cargo/**", "Cargo.lock", "Cargo.toml", "build.rs",
             "src/**", "assets/**", "LICENSE", "NOTICE", "scripts/release-notices/**",
-            "tests/test_release_assets.py",
+            "tests/test_release_assets.py", "scripts/build-deb.sh", "scripts/build-linux-bundle.sh",
+            "scripts/package-deb.py", "tests/test_debian_package.py",
         ))
 
 
