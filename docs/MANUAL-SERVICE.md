@@ -204,6 +204,15 @@ Matrix encryption is outside this walkthrough. The default build includes the
 interoperability. Keep the guide's `encryption.enabled` set to `false` and use an
 unencrypted test room with nonsensitive messages.
 
+The examples above omit optional peer tools. If an existing configuration sets
+`agentMessaging.tools.enabled` to `true`, add `agent-network` to its build
+features. For a Matrix service without encryption support, use
+`--no-default-features --features platform-sdks,agent-network`; to retain default
+features as well, omit `--no-default-features` and use `--features agent-network`.
+Without this feature the bridge rejects the configuration, including during
+`--check-config`. See [Local agent tools](AGENT-TOOLS.md) for the separate
+runtime opt-in.
+
 Copy the selected build before building another feature combination:
 
 ```sh
@@ -329,7 +338,11 @@ Check continuing work before assuming an operation is cancelled.
 
 For an upgrade:
 
-1. Record the source revision and build features. Build the replacement separately.
+1. Record the source revision and existing build features. Build the replacement
+   separately with the features the existing configuration needs. Run the
+   replacement's `--check-config` with the unit's configuration, working
+   directory, and environment before taking it offline. Do not disable an existing
+   capability just to make the replacement pass this check.
 2. Stop the exact connector service and check for continuing harness work.
 3. Take a private, consistent backup of its unit, binary, configuration,
    credentials, bindings, session directories, platform store, and relevant native
@@ -343,7 +356,11 @@ For an upgrade:
 
 Do not use `/clear` or `/reset` to troubleshoot continuity: they delete current
 session history. A changed backend identity or working directory can prevent
-resume; investigate rather than deleting the saved binding.
+resume; investigate rather than deleting the saved binding. For a binary-only
+upgrade, keep the configured backend and any explicit `backendId` unchanged.
+If the working-directory override `agentHome` was unset, leave it unset: setting
+it changes the identity used to match saved bindings even with the same
+`backendId`.
 
 To uninstall, stop and disable only this unit, check remaining processes, remove
 its exact unit file, and run `systemctl --user daemon-reload`. Keep the private
